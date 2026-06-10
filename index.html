@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WCP Member Portal</title>
+    <!-- Fonts: Shrikhand for headings, Noto Sans JP for body -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&family=Zen+Maru+Gothic:wght@400;700;900&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+    <!-- Background removed for claymorphism -->
+
+    <header class="topbar">
+        <div class="logo">
+            <span class="pop-text">WCP</span>
+            <span class="sub-logo">PORTAL</span>
+        </div>
+        <nav class="main-nav">
+            <button class="nav-btn active" data-view="home"><i class="fa-solid fa-house"></i> ホーム</button>
+            <button class="nav-btn" data-view="schedule"><i class="fa-solid fa-calendar-days"></i> スケジュール</button>
+            <button class="nav-btn" data-view="books"><i class="fa-solid fa-book"></i> 図書管理</button>
+            <button class="nav-btn" data-view="roster"><i class="fa-solid fa-users"></i> 名簿</button>
+        </nav>
+        <div class="user-status">
+            <i class="fa-solid fa-face-smile" style="color: var(--accent-blue);"></i> 稼働中
+        </div>
+    </header>
+
+    <main id="app-root" class="container">
+        <!-- Dynamic content will be injected here -->
+    </main>
+
+    <!-- Global Modal for Interactions (e.g., Borrowing, Attendance) -->
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div class="modal-content">
+            <button id="modal-close" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

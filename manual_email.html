@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>メール文の書き方 | WCP Member Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&family=Zen+Maru+Gothic:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+    <div class="pop-background-pattern"></div>
+
+    <header class="topbar">
+        <div class="logo">
+            <span class="pop-text">WCP</span>
+            <span class="sub-logo">PORTAL</span>
+        </div>
+        <nav class="main-nav">
+            <button class="nav-btn" data-view="home" onclick="window.location.href='index.html?view=home'"><i class="fa-solid fa-house"></i> ホーム</button>
+            <button class="nav-btn" data-view="schedule" onclick="window.location.href='index.html?view=schedule'"><i class="fa-solid fa-calendar-days"></i> スケジュール</button>
+            <button class="nav-btn" data-view="books" onclick="window.location.href='index.html?view=books'"><i class="fa-solid fa-book"></i> 図書管理</button>
+            <button class="nav-btn" data-view="roster" onclick="window.location.href='index.html?view=roster'"><i class="fa-solid fa-users"></i> 名簿</button>
+        </nav>
+        <div class="user-status">
+            <i class="fa-solid fa-face-smile" style="color: var(--accent-blue);"></i> 稼働中
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="view-animate">
+            <button class="cyber-btn" style="margin-bottom: 1.5rem;" onclick="window.location.href='index.html'"><i class="fa-solid fa-arrow-left"></i> ホームへ戻る</button>
+            <h1 class="section-title">マニュアル: メール文の書き方</h1>
+            
+            <div class="cyber-card" style="margin-bottom: 2rem;">
+                <h2 style="font-family: var(--font-heading); font-size: 2.5rem; color: var(--accent-blue); margin-bottom: 1rem;">
+                    基本構成
+                </h2>
+                <div style="background: var(--surface-color); padding: 2rem; color: var(--text-main); border-radius: 20px; box-shadow: var(--shadow-in); line-height: 1.8;">
+                    <ol style="padding-left: 1.5rem; font-weight: 700; display: flex; flex-direction: column; gap: 1rem;">
+                        <li><strong>件名（タイトル）:</strong> 一目で用件がわかるように簡潔に書く。例：「【ご相談】〇〇プロジェクトの進捗について」</li>
+                        <li><strong>宛名:</strong> 相手の会社名、部署名、役職、氏名（様）。</li>
+                        <li><strong>挨拶文と名乗り:</strong> 「いつもお世話になっております。WCPの〇〇です。」</li>
+                        <li><strong>本文:</strong> 結論から書き、5W1Hを意識して簡潔に伝える。</li>
+                        <li><strong>結びの挨拶:</strong> 「引き続き、よろしくお願いいたします。」など。</li>
+                        <li><strong>署名:</strong> 自分の名前、所属、連絡先を記載。</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="cyber-card" style="margin-bottom: 2rem;">
+                <h2 style="font-family: var(--font-heading); font-size: 2.5rem; color: var(--accent-pink); margin-bottom: 1rem;">
+                    注意点
+                </h2>
+                <ul style="padding-left: 1.5rem; line-height: 1.8; font-weight: 700;">
+                    <li>誤字脱字がないか必ず確認する。</li>
+                    <li>相手が読みやすいように、適度に改行や空白行を入れる。</li>
+                    <li>敬語表現（尊敬語・謙譲語・丁寧語）を正しく使う。</li>
+                    <li>添付ファイルがある場合は、その旨を本文に記載し、ファイルの容量やパスワードにも注意する。</li>
+                </ul>
+            </div>
+            
+            <div class="cyber-card">
+                <h2 style="font-family: var(--font-heading); font-size: 2.5rem; color: var(--accent-yellow); margin-bottom: 1rem;">
+                    テンプレート例
+                </h2>
+                <pre style="background: #282c34; color: #abb2bf; padding: 1.5rem; border-radius: 10px; font-family: monospace; overflow-x: auto; font-size: 0.95rem; line-height: 1.5;">
+件名：【ご確認】〇〇プロジェクトの進捗報告
+
+〇〇株式会社
+〇〇部 〇〇様
+
+いつも大変お世話になっております。
+WCPの[自分の名前]です。
+
+現在進行中の〇〇プロジェクトにつきまして、
+今週の進捗をご報告いたします。
+
+・タスクA：完了
+・タスクB：進行中（〇月〇日完了予定）
+・タスクC：〇〇のため遅延（現在対応中）
+
+詳細につきましては、添付の資料をご確認ください。
+ご不明な点がございましたら、お気軽にお申し付けください。
+
+引き続き、よろしくお願い申し上げます。
+--------------------------------------------------
+[自分の名前]
+WCP 所属
+Email: xxxx@example.com
+Phone: 090-xxxx-xxxx
+--------------------------------------------------</pre>
+            </div>
+        </div>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>

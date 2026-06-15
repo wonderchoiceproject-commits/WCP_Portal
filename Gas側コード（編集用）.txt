@@ -1,0 +1,347 @@
+// ==========================================
+// APIエンドポイント (GET / POST)
+// ==========================================
+function doGet(e) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  const result = {
+    news: getSheetData(ss, 'News'),
+    books: getSheetData(ss, 'Books'),
+    reviews: getSheetData(ss, 'Reviews'),
+    members: getSheetData(ss, 'Members', true),
+    events: getSheetData(ss, 'Events', true),
+    departments: getSheetData(ss, 'Departments', false)
+  };
+  
+  return ContentService.createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  try {
+    const params = JSON.parse(e.postData.contents);
+    const action = params.action;
+    
+    if (action === 'borrowBook') {
+      updateBookStatus(ss, params.bookId, 'borrowed', params.squadNum, params.dueDate);
+    } else if (action === 'returnBook') {
+      updateBookStatus(ss, params.bookId, 'available', '', '');
+    } else if (action === 'updateAttendance') {
+      updateAttendance(ss, params.eventId, params.squadNum, params.status);
+    } else if (action === 'addEvent') {
+      addEvent(ss, params);
+    } else if (action === 'deleteEvent') {
+      deleteEvent(ss, params.eventId);
+    } else if (action === 'editEvent') {
+      editEvent(ss, params);
+    } else if (action === 'updateMemberField') {
+      updateMemberField(ss, params.squadNum, params.fieldName, params.newValue);
+    } else if (action === 'addReview') {
+      addReview(ss, params);
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify({ success: true }))
+      .setMimeType(ContentService.MimeType.JSON);
+      
+  } catch(error) {
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: error.message }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ==========================================
+// データベース(シート)操作用ヘルパー関数
+// ==========================================
+
+// 汎用データ取得関数
+function getSheetData(ss, sheetName, parseComma = false) {
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) return [];
+  
+  // 日付の時差ズレやパースエラーを防ぐため、文字列としてそのまま取得する
+  const data = sheet.getDataRange().getDisplayValues();
+  if (data.length < 2) return []; // ヘッダーのみの場合は空配列
+  
+  const headers = data[0].map(h => {
+    let clean = String(h).trim();
+    let lower = clean.toLowerCase();
+    if (lower.includes('color')) return 'color';
+    if (lower === 'starttime') return 'startTime';
+    if (lower === 'endtime') return 'endTime';
+    if (lower === 'id') return 'id';
+    if (lower === 'title') return 'title';
+    if (lower === 'date') return 'date';
+    if (lower === 'location') return 'location';
+    if (lower === 'description') return 'description';
+    if (lower === 'capacity') return 'capacity';
+    if (lower === 'host') return 'host';
+    if (lower === 'attendees') return 'attendees';
+    if (lower === 'absentees') return 'absentees';
+    return clean;
+  });
+  const rows = data.slice(1);
+  
+  return rows.map(row => {
+    let obj = {};
+    headers.forEach((header, index) => {
+      let val = row[index];
+      // AttendeesやBadgesなどのカンマ区切り文字列を配列に変換
+      if (parseComma && (header === 'badges' || header === 'attendees' || header === 'absentees' || header === 'readingRecord' || header === 'completedTasks' || header === 'departmentIds' || header === 'departmentids')) {
+        obj[header] = val ? String(val).split(',').map(s => s.trim()) : [];
+      } else {
+        obj[header] = val;
+      }
+    });
+    return obj;
+  });
+}
+
+// 図書の貸出ステータス更新
+function updateBookStatus(ss, bookId, status, borrower, dueDate) {
+  const sheet = ss.getSheetByName('Books');
+  if (!sheet) throw new Error("Booksシートが見つかりません");
+  
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  
+  const idIndex = headers.indexOf('id');
+  const statusIndex = headers.indexOf('status');
+  const borrowerIndex = headers.indexOf('borrower');
+  const dueDateIndex = headers.indexOf('dueDate');
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][idIndex] === bookId) {
+      sheet.getRange(i + 1, statusIndex + 1).setValue(status);
+      sheet.getRange(i + 1, borrowerIndex + 1).setValue(borrower);
+      sheet.getRange(i + 1, dueDateIndex + 1).setValue(dueDate);
+      break;
+    }
+  }
+}
+
+// イベントの追加
+function addEvent(ss, params) {
+  const sheet = ss.getSheetByName('Events');
+  if (!sheet) throw new Error("Eventsシートが見つかりません");
+  
+  const eventId = "evt_NEW_" + new Date().getTime();
+  const headers = sheet.getDataRange().getValues()[0];
+  const normalizedHeaders = headers.map(h => String(h).trim().toLowerCase());
+  const newRow = new Array(headers.length).fill('');
+  
+  const idIndex = normalizedHeaders.indexOf('id');
+  const titleIndex = normalizedHeaders.indexOf('title');
+  const dateIndex = normalizedHeaders.indexOf('date');
+  const startTimeIndex = normalizedHeaders.indexOf('starttime');
+  const endTimeIndex = normalizedHeaders.indexOf('endtime');
+  const locationIndex = normalizedHeaders.indexOf('location');
+  const colorIndex = normalizedHeaders.findIndex(h => h.includes('color'));
+  const descIndex = normalizedHeaders.indexOf('description');
+  const capIndex = normalizedHeaders.indexOf('capacity');
+  const hostIndex = normalizedHeaders.indexOf('host');
+  const attendeesIndex = normalizedHeaders.indexOf('attendees');
+  const absenteesIndex = normalizedHeaders.indexOf('absentees');
+  
+  if (idIndex !== -1) newRow[idIndex] = eventId;
+  if (titleIndex !== -1) newRow[titleIndex] = params.title;
+  if (dateIndex !== -1) newRow[dateIndex] = params.date ? "'" + params.date : '';
+  if (startTimeIndex !== -1) newRow[startTimeIndex] = params.startTime ? "'" + params.startTime : '';
+  if (endTimeIndex !== -1) newRow[endTimeIndex] = params.endTime ? "'" + params.endTime : '';
+  if (locationIndex !== -1) newRow[locationIndex] = params.location;
+  if (colorIndex !== -1) newRow[colorIndex] = params.color ? "'" + params.color : "'#e0f2fe";
+  if (descIndex !== -1) newRow[descIndex] = "DEBUG: " + JSON.stringify(params);
+  if (capIndex !== -1) newRow[capIndex] = (params.capacity === undefined || params.capacity === null) ? "" : params.capacity;
+  if (hostIndex !== -1) newRow[hostIndex] = (params.host === undefined || params.host === null) ? "" : params.host;
+  if (attendeesIndex !== -1) newRow[attendeesIndex] = params.attendees !== undefined ? params.attendees : '';
+  if (absenteesIndex !== -1) newRow[absenteesIndex] = params.absentees !== undefined ? params.absentees : '';
+  
+  sheet.appendRow(newRow);
+}
+
+// イベントの削除
+function deleteEvent(ss, eventId) {
+  const sheet = ss.getSheetByName('Events');
+  if (!sheet) throw new Error("Eventsシートが見つかりません");
+  
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idIndex = headers.indexOf('id');
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][idIndex] === eventId) {
+      sheet.deleteRow(i + 1);
+      break;
+    }
+  }
+}
+
+// イベントの編集
+function editEvent(ss, params) {
+  const sheet = ss.getSheetByName('Events');
+  if (!sheet) throw new Error("Eventsシートが見つかりません");
+  
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const normalizedHeaders = headers.map(h => String(h).trim().toLowerCase());
+  
+  const idIndex = normalizedHeaders.indexOf('id');
+  const titleIndex = normalizedHeaders.indexOf('title');
+  const dateIndex = normalizedHeaders.indexOf('date');
+  const startTimeIndex = normalizedHeaders.indexOf('starttime');
+  const endTimeIndex = normalizedHeaders.indexOf('endtime');
+  const locationIndex = normalizedHeaders.indexOf('location');
+  const colorIndex = normalizedHeaders.findIndex(h => h.includes('color'));
+  const descIndex = normalizedHeaders.indexOf('description');
+  const capIndex = normalizedHeaders.indexOf('capacity');
+  const hostIndex = normalizedHeaders.indexOf('host');
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][idIndex] === params.eventId) {
+      if (titleIndex !== -1) sheet.getRange(i + 1, titleIndex + 1).setValue(params.title);
+      if (dateIndex !== -1) sheet.getRange(i + 1, dateIndex + 1).setValue(params.date ? "'" + params.date : '');
+      if (startTimeIndex !== -1) sheet.getRange(i + 1, startTimeIndex + 1).setValue(params.startTime ? "'" + params.startTime : '');
+      if (endTimeIndex !== -1) sheet.getRange(i + 1, endTimeIndex + 1).setValue(params.endTime ? "'" + params.endTime : '');
+      if (locationIndex !== -1) sheet.getRange(i + 1, locationIndex + 1).setValue(params.location || '');
+      if (colorIndex !== -1) sheet.getRange(i + 1, colorIndex + 1).setValue(params.color ? "'" + params.color : "'#e0f2fe");
+      if (descIndex !== -1) sheet.getRange(i + 1, descIndex + 1).setValue(params.description || '');
+      if (capIndex !== -1) sheet.getRange(i + 1, capIndex + 1).setValue((params.capacity === undefined || params.capacity === null) ? "" : params.capacity);
+      if (hostIndex !== -1) sheet.getRange(i + 1, hostIndex + 1).setValue((params.host === undefined || params.host === null) ? "" : params.host);
+      break;
+    }
+  }
+}
+
+
+// イベントの出欠登録更新
+function updateAttendance(ss, eventId, squadNum, status) {
+  const sheet = ss.getSheetByName('Events');
+  if (!sheet) throw new Error("Eventsシートが見つかりません");
+  
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  
+  const idIndex = headers.indexOf('id');
+  const attendeesIndex = headers.indexOf('attendees');
+  const absenteesIndex = headers.indexOf('absentees');
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][idIndex] === eventId) {
+      let currentAttendeesStr = data[i][attendeesIndex];
+      let attendees = currentAttendeesStr ? String(currentAttendeesStr).split(',').map(s => s.trim()) : [];
+      let currentAbsenteesStr = absenteesIndex !== -1 ? data[i][absenteesIndex] : '';
+      let absentees = currentAbsenteesStr ? String(currentAbsenteesStr).split(',').map(s => s.trim()) : [];
+      
+      if (status === 'attend') {
+        if (!attendees.includes(squadNum)) attendees.push(squadNum);
+        absentees = absentees.filter(a => a !== squadNum);
+      } else if (status === 'absent') {
+        if (!absentees.includes(squadNum)) absentees.push(squadNum);
+        attendees = attendees.filter(a => a !== squadNum);
+      }
+      
+      if (attendeesIndex !== -1) sheet.getRange(i + 1, attendeesIndex + 1).setValue(attendees.join(','));
+      if (absenteesIndex !== -1) sheet.getRange(i + 1, absenteesIndex + 1).setValue(absentees.join(','));
+      break;
+    }
+  }
+}
+
+// メンバーの単一フィールド更新
+function updateMemberField(ss, squadNum, fieldName, newValue) {
+  const sheet = ss.getSheetByName('Members');
+  if (!sheet) throw new Error("Membersシートが見つかりません");
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const sqIndex = headers.indexOf('squadNumber');
+  const targetIndex = headers.indexOf(fieldName);
+  
+  if (sqIndex === -1 || targetIndex === -1) throw new Error("指定のカラムが見つかりません");
+  
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][sqIndex]) === String(squadNum)) {
+      sheet.getRange(i + 1, targetIndex + 1).setValue(newValue);
+      break;
+    }
+  }
+}
+
+// 読書感想文の追加
+function addReview(ss, params) {
+  const sheet = ss.getSheetByName('Reviews');
+  if (!sheet) throw new Error("Reviewsシートが見つかりません");
+  
+  const reviewId = "rev_" + new Date().getTime();
+  const headers = sheet.getDataRange().getValues()[0];
+  const newRow = new Array(headers.length).fill('');
+  
+  const idIndex = headers.indexOf('id');
+  const squadNumIndex = headers.indexOf('squadNumber');
+  const bookIdIndex = headers.indexOf('bookId');
+  const bookTitleIndex = headers.indexOf('bookTitle');
+  const docLinkIndex = headers.indexOf('docLink');
+  
+  // 必須項目など、もしあれば設定する（現状は指定通り）
+  if (idIndex !== -1) newRow[idIndex] = reviewId;
+  if (squadNumIndex !== -1) newRow[squadNumIndex] = params.squadNumber;
+  if (bookIdIndex !== -1) newRow[bookIdIndex] = params.bookId;
+  if (bookTitleIndex !== -1) newRow[bookTitleIndex] = params.bookTitle;
+  if (docLinkIndex !== -1) newRow[docLinkIndex] = params.docLink;
+  // 日付の記録が必要な場合、dateIndexなどがあるか確認し設定することも可能ですが仕様に従い基本5項目を設定
+  const dateIndex = headers.indexOf('date');
+  if (dateIndex !== -1) {
+    const d = new Date();
+    newRow[dateIndex] = Utilities.formatDate(d, "JST", "yyyy/MM/dd");
+  }
+  // reviewer（背番号と同じか）の対応が必要か確認
+  const reviewerIndex = headers.indexOf('reviewer');
+  if (reviewerIndex !== -1) newRow[reviewerIndex] = params.squadNumber;
+  
+  sheet.appendRow(newRow);
+
+  // 課題図書 (K-から始まるbookId) の場合、Membersシートの該当列を自動チェック
+  if (params.bookId && params.bookId.startsWith('K-')) {
+    const parts = params.bookId.split('-');
+    if (parts.length >= 2) {
+      const targetColumnHeader = parts[0] + '-' + parts[1]; // 例: "K-04"
+      
+      const memberSheet = ss.getSheetByName('Members');
+      if (memberSheet) {
+        const mData = memberSheet.getDataRange().getValues();
+        const mHeaders = mData[0];
+        
+        const mSqIndex = mHeaders.indexOf('squadNumber');
+        const targetIndex = mHeaders.indexOf(targetColumnHeader);
+        
+        if (mSqIndex !== -1 && targetIndex !== -1) {
+          for (let i = 1; i < mData.length; i++) {
+            if (String(mData[i][mSqIndex]) === String(params.squadNumber)) {
+              memberSheet.getRange(i + 1, targetIndex + 1).setValue(true);
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// ==========================================
+// Google ドキュメント連携用 (将来の拡張用)
+// ==========================================
+
+/**
+ * 指定されたGoogleドキュメントのIDからテキスト内容を取得する関数
+ * @param {string} docId - GoogleドキュメントのID
+ * @returns {string} ドキュメントのテキスト内容
+ */
+function getDocContent(docId) {
+  try {
+    const doc = DocumentApp.openById(docId);
+    return doc.getBody().getText();
+  } catch (error) {
+    console.error("ドキュメント取得エラー: " + error.message);
+    return "ドキュメントの内容を取得できませんでした。権限やIDを確認してください。";
+  }
+}

@@ -1,7 +1,7 @@
 // ==========================================
 // CONFIGURATION & STATE
 // ==========================================
-const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbyGQU0GV6xbSBwKAxYFdLh0hWSE4kkL37JcphckJUiYofPwKvAnX3CzsRQ0SJfgk74o/exec';
+const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwafXQP1fUCVfq3B56HW3p93IvQ2aTep5ONqR9c_WIRN4QSM8oYSySh6_D59lNy9EWQ/exec';
 let currentView = 'home';
 let viewHistory = [];
 let isLoading = true;
@@ -12,8 +12,11 @@ let mockData = {
     books: [],
     reviews: [],
     members: [],
-    events: []
+    events: [],
+    departments: []
 };
+
+let currentRosterTab = 'members';
 
 // ==========================================
 // CATEGORY REQUIREMENTS
@@ -75,6 +78,27 @@ function getNextCategoryInfo(currentCategory) {
         };
     }
     return null;
+}
+
+function parseDepartmentIds(deptInput) {
+    if (!deptInput) return [];
+    let deptStrings = [];
+    if (Array.isArray(deptInput)) {
+        deptStrings = deptInput;
+    } else if (typeof deptInput === 'string') {
+        deptStrings = deptInput.split(',');
+    }
+    return deptStrings.map(str => {
+        const cleanStr = String(str).trim();
+        const match = cleanStr.match(/^(.+?)(?:\((.+?)\))?$/);
+        if (match) {
+            return {
+                id: match[1].trim(),
+                title: match[2] ? match[2].trim() : null
+            };
+        }
+        return { id: cleanStr, title: null };
+    });
 }
 
 // ==========================================
@@ -223,7 +247,7 @@ function renderHome() {
 
             <div class="grid-2" style="margin-bottom: 4rem;">
                 <div>
-                    <h3 style="font-family: var(--font-heading); font-size: 4rem; margin-bottom: 1rem; color: var(--accent-blue); line-height: 1;">01_ 理念</h3>
+                    <h3 style="font-family: var(--font-heading); font-size: 4rem; margin-bottom: 1rem; color: var(--accent-blue); line-height: 1;">理念</h3>
                     <div style="font-family: var(--font-mono); font-size: 1.1rem; line-height: 1.8; color: var(--text-muted); border-left: 2px solid var(--border-color); padding-left: 1rem;">
                         <strong style="color: var(--accent-blue);">理念:</strong><br>
                         若者が自分たちの「やりたい」を追求し、自分の人生と自分に関わる人の人生全てを豊かにする。<br><br>
@@ -235,7 +259,7 @@ function renderHome() {
                 </div>
 
                 <div>
-                    <h3 style="font-family: var(--font-heading); font-size: 4rem; margin-bottom: 1rem; color: var(--accent-yellow); line-height: 1;">02_ お知らせ</h3>
+                    <h3 style="font-family: var(--font-heading); font-size: 4rem; margin-bottom: 1rem; color: var(--accent-yellow); line-height: 1;">お知らせ</h3>
                     <div class="news-list" style="font-family: var(--font-mono); border-left: 2px solid var(--border-color); padding-left: 1rem; max-height: 250px; overflow-y: auto;">
                         ${mockData.news.map(item => `
                             <div class="news-item">
@@ -309,13 +333,402 @@ function renderBooks() {
     appRoot.innerHTML = html;
 }
 
-function renderRoster() {
+window.switchRosterTab = function(tab) {
+    currentRosterTab = tab;
+    renderRoster();
+}
+
+function getOrganizationHtml() {
+    let initialNodes = renderOrgNodes(null, 0);
+    return `
+        <div class="organization-container" style="overflow: hidden;">
+            <div class="horizontal-tree-wrapper" id="horizontal-tree-wrapper">
+                ${initialNodes ? `<div class="tree-column" id="tree-col-0" data-col="0">${initialNodes}</div>` : '<div style="text-align: center; padding: 2rem; color: var(--text-muted); width: 100%;">組織データがありません。</div>'}
+            </div>
+        </div>
+    `;
+}
+
+function getDeptId(dept) {
+    return dept.id || dept.ID || dept.Id || '';
+}
+
+function getDeptParentId(dept) {
+    return dept.parentId || dept.parentid || dept.ParentId || dept.ParentID || '';
+}
+
+function getDeptName(dept) {
+    return dept.name || dept.Name || dept.NAME || '名称未設定';
+}
+
+function renderOrgNodes(parentId, columnIndex) {
+    if (!mockData.departments) return '';
+    const parentKey = String(parentId || '');
+    
+    // Find children
+    const children = mockData.departments.filter(d => String(getDeptParentId(d)) === parentKey);
+    if (children.length === 0) return '';
+    
+    let html = '';
+    children.forEach(dept => {
+        const deptId = getDeptId(dept);
+        const deptName = getDeptName(dept);
+        if (!deptId) return;
+        
+        const hasMembers = mockData.members && mockData.members.some(m => {
+            const mDepts = parseDepartmentIds(m.departmentIds || m.departmentids || m.departmentsIds || m.DepartmentsIds);
+            return mDepts.some(d => String(d.id) === String(deptId));
+        });
+        
+        const hasChildren = mockData.departments.some(d => String(getDeptParentId(d)) === String(deptId));
+        
+        // VIEW MEMBERS ボタンは「非最下位層 かつ メンバーが存在する」場合に表示
+        const showMembersButton = hasMembers && hasChildren;
+        
+        html += `
+            <div class="tree-node-wrapper">
+                <div class="org-folder-card tree-node-card" id="org-node-${deptId}" onclick="expandOrgNode('${deptId}', ${columnIndex}, this, ${hasChildren}, ${hasMembers}, false)">
+                    <div class="org-folder-header">
+                        <div class="org-folder-title">${deptName}</div>
+                        ${showMembersButton ? `<button class="cyber-btn neon-btn" onclick="event.stopPropagation(); expandOrgNode('${deptId}', ${columnIndex}, this.closest('.org-folder-card'), ${hasChildren}, ${hasMembers}, true)">VIEW MEMBERS</button>` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    return html;
+}
+
+function renderMemberNodes(deptId, columnIndex) {
+    if (!mockData.members) return '';
+    const members = mockData.members.filter(m => {
+        const mDepts = parseDepartmentIds(m.departmentIds || m.departmentids || m.departmentsIds || m.DepartmentsIds);
+        return mDepts.some(d => String(d.id) === String(deptId));
+    });
+    if (members.length === 0) return '';
+    
+    const dData = mockData.departments.find(d => String(getDeptId(d)) === String(deptId));
+    const dName = dData ? getDeptName(dData) : 'メンバー';
+    
+    let membersHtml = members.map(m => {
+        const mDepts = parseDepartmentIds(m.departmentIds || m.departmentids || m.departmentsIds || m.DepartmentsIds);
+        const targetDept = mDepts.find(d => String(d.id) === String(deptId));
+
+        // 肩書：部署内の役職（あれば表示）
+        const title = targetDept && targetDept.title ? targetDept.title : '';
+        const titleTag = title
+            ? `<span style="background: var(--accent-yellow); color: #333; padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: bold; font-size: 0.72rem; white-space: nowrap; box-shadow: 0 0 6px var(--accent-yellow);">${title}</span>`
+            : '';
+
+        // カテゴリ/区分：あれば名前の下に薄く表示
+        const category = (m.category || '').trim();
+        const categoryTag = category
+            ? `<div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.15rem;">${category}</div>`
+            : '';
+            
+        return `
+            <div class="member-item" onclick="window.location.hash=''; switchRosterTab('members'); setTimeout(() => toggleMemberDetails('${m.squadNumber}'), 100);">
+                <div class="avatar" style="width: 32px; height: 32px; font-size: 0.85rem; margin-right: 0.75rem; flex-shrink: 0;">${m.squadNumber}</div>
+                <div style="min-width: 0;">
+                    <div style="font-size: 0.9rem; font-weight: bold; color: var(--text-main); display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                        ${m.name}${titleTag ? '&nbsp;' + titleTag : ''}
+                    </div>
+                    ${categoryTag}
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    return `
+        <div class="tree-node-wrapper">
+            <div class="org-folder-card tree-node-card member-list-card">
+                <div class="org-folder-header">
+                    <div class="org-folder-title" style="color: var(--accent-green); text-shadow: 0 0 8px rgba(72, 187, 120, 0.6);">
+                        <i class="fa-solid fa-users"></i> ${dName}
+                    </div>
+                </div>
+                <div class="member-list-content">
+                    ${membersHtml}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+window.expandOrgNode = function(deptId, columnIndex, element, hasChildren, hasMembers, isMembersOnly) {
+    // 1. 同階層の兄弟を非アクティブにする
+    const column = element.closest('.tree-column');
+    if (column) {
+        column.querySelectorAll('.org-folder-card').forEach(card => card.classList.remove('active'));
+    }
+    element.classList.add('active');
+
+    // 2. Remove all columns to the right of the current one
+    const wrapper = document.getElementById('horizontal-tree-wrapper');
+    if (!wrapper) return;
+    const allCols = Array.from(wrapper.querySelectorAll('.tree-column'));
+    allCols.forEach(col => {
+        if (parseInt(col.dataset.col) > columnIndex) {
+            col.remove();
+        }
+    });
+    // 既存のSVG線も消す
+    const oldSvg = document.getElementById('tree-connections-svg');
+    if (oldSvg) oldSvg.remove();
+
+    // 3. Render next column
+    if (isMembersOnly || (!hasChildren && hasMembers) || hasChildren) {
+        let nextHtml = '';
+        const isMemberColumn = isMembersOnly || (!hasChildren && hasMembers);
+        
+        if (isMemberColumn) {
+            if (hasMembers) nextHtml = renderMemberNodes(deptId, columnIndex + 1);
+        } else {
+            if (hasChildren) nextHtml = renderOrgNodes(deptId, columnIndex + 1);
+        }
+        
+        if (nextHtml) {
+            const newColHtml = `<div class="tree-column" id="tree-col-${columnIndex + 1}" data-col="${columnIndex + 1}">${nextHtml}</div>`;
+            wrapper.insertAdjacentHTML('beforeend', newColHtml);
+            
+            // Frame 1: 位置合わせ（最初の子カードの上端 = 親カードの上端）
+            requestAnimationFrame(() => {
+                const addedCol = document.getElementById(`tree-col-${columnIndex + 1}`);
+                if (addedCol) {
+                    const parentRect = element.getBoundingClientRect();
+                    const colRect = addedCol.getBoundingClientRect();
+                    // 最初の子カードの上端を親カードの上端に合わせる
+                    const shift = Math.max(0, parentRect.top - colRect.top);
+                    addedCol.style.paddingTop = shift + 'px';
+                    // ※ メンバーカードの高さは強制しない。コンテンツに合わせて自動調整させる
+                }
+
+                // アニメーション(0.4s)完了後に線を描く → 座標がfinalポジションで正確に取れる
+                setTimeout(() => {
+                    drawTreeLines();
+                    const addedCol2 = document.getElementById(`tree-col-${columnIndex + 1}`);
+                    if (addedCol2) {
+                        addedCol2.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'end' });
+                    }
+                }, 420);
+            });
+        }
+    }
+}
+
+/**
+ * SVGオーバーレイで全カラム間の接続線を描画する
+ *
+ * 線の構造（複数子カードの場合）:
+ *   ① 枝1: 親カード右辺 → 最初の子カード左辺 (親カードの中心Yの高さで水平)
+ *   ② 幹: 枝1の中点X から 最後の子カードの中心Y まで垂直に下へ
+ *   ③ 各枝: 2枚目以降の子カードの左辺 → 幹X (各カードの中心Yの高さで水平)
+ *
+ * 線の構造（子カード1枚の場合）:
+ *   ① 直線: 親カード右辺 → カード左辺 (親カードの中心Yの高さで水平)
+ */
+function drawTreeLines() {
+    const wrapper = document.getElementById('horizontal-tree-wrapper');
+    if (!wrapper) return;
+
+    // 既存のSVGを削除
+    const old = document.getElementById('tree-connections-svg');
+    if (old) old.remove();
+
+    const cols = Array.from(wrapper.querySelectorAll('.tree-column'));
+    if (cols.length < 2) return;
+
+    const NS = 'http://www.w3.org/2000/svg';
+
+    // SVGをDOMの先頭に挿入（すべてのカラムより前 = 背面）
+    // z-index:0 にすることで tree-column(z-index:1) が前面に来て線が隠れる
+    const svg = document.createElementNS(NS, 'svg');
+    svg.id = 'tree-connections-svg';
+    svg.setAttribute('width', wrapper.scrollWidth);
+    svg.setAttribute('height', wrapper.scrollHeight);
+    svg.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;z-index:0;overflow:visible;';
+    wrapper.prepend(svg);
+
+    // 座標変換: viewport座標 → wrapper内スクロール座標
+    // SVGはwrapperのpadding-box左上原点を(0,0)とする
+    const wStyle = getComputedStyle(wrapper);
+    const bLeft = parseFloat(wStyle.borderLeftWidth) || 0;
+    const bTop  = parseFloat(wStyle.borderTopWidth)  || 0;
+    const wRect = wrapper.getBoundingClientRect();
+    const ox = wRect.left + bLeft;  // SVG(0,0)のviewport x
+    const oy = wRect.top  + bTop;   // SVG(0,0)のviewport y
+    const sx = wrapper.scrollLeft;
+    const sy = wrapper.scrollTop;
+
+    function toX(vx) { return vx - ox + sx; }
+    function toY(vy) { return vy - oy + sy; }
+
+    function addLine(x1, y1, x2, y2, color) {
+        const line = document.createElementNS(NS, 'line');
+        line.setAttribute('x1', x1.toFixed(1));
+        line.setAttribute('y1', y1.toFixed(1));
+        line.setAttribute('x2', x2.toFixed(1));
+        line.setAttribute('y2', y2.toFixed(1));
+        line.setAttribute('stroke', color || '#63b3ed');
+        line.setAttribute('stroke-width', '2.5');
+        line.setAttribute('stroke-opacity', '0.85');
+        line.setAttribute('stroke-linecap', 'round');
+        svg.appendChild(line);
+    }
+
+    // 各カラム間の接続線を描画
+    for (let i = 1; i < cols.length; i++) {
+        const childCol  = cols[i];
+        const parentCol = cols[i - 1];
+
+        const activeCard = parentCol.querySelector('.org-folder-card.active');
+        if (!activeCard) continue;
+
+        const childWrappers = Array.from(childCol.querySelectorAll(':scope > .tree-node-wrapper'));
+        if (!childWrappers.length) continue;
+
+        const isMemberCol = !!childCol.querySelector('.member-list-card');
+        const color = isMemberCol ? '#48bb78' : '#63b3ed';
+
+        // 親カードの座標（右辺・中心Y）
+        const pRect = activeCard.getBoundingClientRect();
+        const px2 = toX(pRect.right);
+        const pcy = toY(pRect.top + pRect.height / 2);
+
+        // 子カラムの左辺をすべての枝の終点として使う
+        // （カードの left は animation途中でブレる可能性があるため、カラム左辺を基準にする）
+        const colRect = childCol.getBoundingClientRect();
+        const colLeft = toX(colRect.left);
+
+        // 最後の子カードの中心Y
+        const lcEl = childWrappers[childWrappers.length - 1].querySelector('.org-folder-card');
+        if (!lcEl) continue;
+        const lr = lcEl.getBoundingClientRect();
+        const lcy = toY(lr.top + lr.height / 2);
+
+        if (childWrappers.length === 1) {
+            // 子カード1枚: 親右辺 → カラム左辺 (親カードの中心Yで)
+            addLine(px2, pcy, colLeft, pcy, color);
+        } else {
+            // ① 枝1: 親右辺 → カラム左辺 (親カードの中心Yで)
+            addLine(px2, pcy, colLeft, pcy, color);
+
+            // 幹X = 枝1の中点
+            const tx = (px2 + colLeft) / 2;
+
+            // ② 幹: 枝1の中点Xから最後の子カードの中心Yまで垂直
+            addLine(tx, pcy, tx, lcy, color);
+
+            // ③ 各枝: 2枚目以降の子カードの左辺 → 幹X
+            for (let j = 1; j < childWrappers.length; j++) {
+                const card = childWrappers[j].querySelector('.org-folder-card');
+                if (!card) continue;
+                const r = card.getBoundingClientRect();
+                const ccy = toY(r.top + r.height / 2);
+                addLine(colLeft, ccy, tx, ccy, color);
+            }
+        }
+    }
+}
+
+window.openDepartmentMembersModal = function(deptId) {
+    const allIds = getAllDescendantDeptIds(deptId);
+    allIds.push(String(deptId));
+    
+    const targetMembers = (mockData.members || []).filter(m => {
+        const mDepts = parseDepartmentIds(m.departmentIds || m.departmentids || m.departmentsIds || m.DepartmentsIds);
+        return mDepts.some(d => allIds.includes(String(d.id)));
+    });
+    
+    const dData = mockData.departments.find(d => String(getDeptId(d)) === String(deptId));
+    const dName = dData ? getDeptName(dData) : deptId;
+    
     let html = `
-        <div class="view-animate">
-            ${getBackButtonHtml()}
-            <h1 class="section-title">メンバー名簿</h1>
+        <h2 style="margin-bottom: 1rem; color: var(--accent-blue); text-shadow: 0 0 10px var(--accent-blue);">
+            <i class="fa-solid fa-users-viewfinder"></i> ${dName} のメンバー
+        </h2>
+        <div style="max-height: 60vh; overflow-y: auto; padding-right: 1rem;">
+            ${targetMembers.length === 0 ? '<p style="color: var(--text-muted);">所属メンバーはいません。</p>' : ''}
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                ${targetMembers.map(m => {
+                    const mDepts = parseDepartmentIds(m.departmentIds || m.departmentids);
+                    const targetDept = mDepts.find(d => allIds.includes(String(d.id)));
+                    const titleTag = targetDept && targetDept.title 
+                        ? `<span style="background: var(--accent-yellow); color: #333; padding: 0.2rem 0.6rem; border-radius: 4px; font-weight: bold; font-size: 0.85rem; margin-right: 0.5rem; box-shadow: 0 0 8px var(--accent-yellow);">[${targetDept.title}]</span>` 
+                        : '';
+                        
+                    return `
+                        <div style="background: rgba(0,0,0,0.05); padding: 1rem; border-radius: 12px; display: flex; align-items: center; border-left: 4px solid var(--accent-blue);">
+                            <div class="avatar" style="width: 50px; height: 50px; font-size: 1.2rem; margin-right: 1rem;">${m.squadNumber}</div>
+                            <div>
+                                <div style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); margin-bottom: 0.3rem;">
+                                    ${titleTag}${m.name}
+                                </div>
+                                <div style="font-size: 0.85rem; color: var(--text-muted);">
+                                    背番号: ${m.squadNumber} / カテゴリー: ${m.category || '未登録'}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+    `;
+    openModal(html);
+}
+
+function getAllDescendantDeptIds(parentId, visited = new Set()) {
+    let ids = [];
+    if (!mockData.departments) return ids;
+    const parentKey = String(parentId || '');
+    if (visited.has(parentKey)) return ids;
+    visited.add(parentKey);
+
+    const children = mockData.departments.filter(d => String(getDeptParentId(d)) === parentKey);
+    children.forEach(c => {
+        const cId = getDeptId(c);
+        if (cId && !visited.has(String(cId))) {
+            ids.push(String(cId));
+            const newVisited = new Set(visited);
+            ids = ids.concat(getAllDescendantDeptIds(cId, newVisited));
+        }
+    });
+    return ids;
+}
+
+function renderRoster() {
+    mockData.members = mockData.members || [];
+    mockData.departments = mockData.departments || [];
+    mockData.reviews = mockData.reviews || [];
+
+    let tabsHtml = `
+        <div class="schedule-tabs" style="margin-bottom: 2rem;">
+            <button class="schedule-tab-btn ${currentRosterTab === 'members' ? 'active' : ''}" onclick="switchRosterTab('members')">
+                <i class="fa-solid fa-users"></i> メンバー
+            </button>
+            <button class="schedule-tab-btn ${currentRosterTab === 'organization' ? 'active' : ''}" onclick="switchRosterTab('organization')">
+                <i class="fa-solid fa-sitemap"></i> 組織
+            </button>
+        </div>
+    `;
+
+    let contentHtml = '';
+
+    if (currentRosterTab === 'members') {
+        contentHtml = `
             <div style="display: flex; flex-direction: column; gap: 1.5rem;">
-                ${mockData.members.map(member => `
+                ${mockData.members.map(member => {
+                    const depts = parseDepartmentIds(member.departmentIds || member.departmentids || member.departmentsIds || member.DepartmentsIds);
+                    let deptBadgesHtml = '';
+                    if (depts && depts.length > 0 && mockData.departments) {
+                        deptBadgesHtml = depts.map(dept => {
+                            const dData = mockData.departments.find(d => String(getDeptId(d)) === String(dept.id));
+                            const dName = dData ? getDeptName(dData) : dept.id;
+                            const titleStr = dept.title ? ` / ${dept.title}` : '';
+                            return `<span class="badge" style="background: var(--surface-color); border: 1px solid var(--accent-blue);"><i class="fa-solid fa-folder-open"></i> ${dName}${titleStr}</span>`;
+                        }).join('');
+                    }
+                    return `
                     <div class="cyber-card member-card" style="cursor: pointer;" onclick="toggleMemberDetails('${member.squadNumber}')">
                         <div class="profile-header" style="margin-bottom: 0;">
                             <div class="avatar">${member.squadNumber}</div>
@@ -324,6 +737,9 @@ function renderRoster() {
                                 <div style="font-family: var(--font-heading); font-size: 0.95rem; color: var(--text-muted); display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap;">
                                     <span>背番号: <span style="color: var(--text-main); font-weight: bold;">${member.squadNumber}</span></span>
                                     <span>カテゴリー: <span style="color: var(--text-main); font-weight: bold;">${member.category || '未登録'}</span></span>
+                                </div>
+                                <div class="badge-list" style="margin-top: 0.5rem;">
+                                    ${deptBadgesHtml}
                                 </div>
                             </div>
                             <div class="accordion-icon" id="icon-${member.squadNumber}" style="color: var(--accent-blue); font-size: 1.5rem; margin-right: 1rem; display: flex; align-items: center;">
@@ -376,7 +792,7 @@ function renderRoster() {
                                     <h4 style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.3rem;">読書記録</h4>
                                     <div style="font-size: 0.9rem; display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem;">
                                         ${(() => {
-                                            const memberReviews = mockData.reviews.filter(r => String(r.squadNumber) === String(member.squadNumber));
+                                            const memberReviews = (mockData.reviews || []).filter(r => String(r.squadNumber) === String(member.squadNumber));
                                             if (memberReviews.length > 0) {
                                                 return memberReviews.map(rev => `<a href="${rev.docLink}" target="_blank" rel="noopener noreferrer" class="cyber-btn" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem;" onclick="event.stopPropagation();"><i class="fa-solid fa-file-lines"></i> ${rev.bookTitle}</a>`).join('');
                                             } else {
@@ -401,8 +817,20 @@ function renderRoster() {
                             </div>
                         </div>
                     </div>
-                `).join('')}
+                    `;
+                }).join('')}
             </div>
+        `;
+    } else if (currentRosterTab === 'organization') {
+        contentHtml = getOrganizationHtml();
+    }
+
+    let html = `
+        <div class="view-animate">
+            ${getBackButtonHtml()}
+            <h1 class="section-title">メンバー名簿</h1>
+            ${tabsHtml}
+            ${contentHtml}
         </div>
     `;
     appRoot.innerHTML = html;

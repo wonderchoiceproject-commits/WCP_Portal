@@ -43,6 +43,15 @@
         </div>
     </div>
 
+    <!-- Document Viewer Modal -->
+    <div id="doc-viewer-overlay" class="modal-overlay hidden">
+        <div class="modal-content doc-viewer-content">
+            <button id="doc-viewer-close" class="modal-close" onclick="closeDocViewerModal()"><i class="fa-solid fa-xmark"></i></button>
+            <h2 id="doc-viewer-title" style="margin-bottom: 1rem; color: var(--accent-green); border-bottom: 1px dashed var(--border-color); padding-bottom: 0.5rem;"></h2>
+            <div id="doc-viewer-body" class="doc-viewer-body"></div>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>

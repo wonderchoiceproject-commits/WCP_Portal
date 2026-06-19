@@ -1,7 +1,7 @@
 // ==========================================
 // CONFIGURATION & STATE
 // ==========================================
-const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwafXQP1fUCVfq3B56HW3p93IvQ2aTep5ONqR9c_WIRN4QSM8oYSySh6_D59lNy9EWQ/exec';
+const GAS_API_URL = 'https://script.google.com/macros/s/AKfycby-CnqVM4N_qNgxUtYPJ8KEApNNz3DdgMhRpEHOiuIqCj_1k6nFq08UsuYPMfe-bV2Z/exec';
 let currentView = 'home';
 let viewHistory = [];
 let isLoading = true;
@@ -17,6 +17,8 @@ let mockData = {
 };
 
 let currentRosterTab = 'members';
+let isEditMode = false;
+let editModeTargetSquad = null;
 
 // ==========================================
 // CATEGORY REQUIREMENTS
@@ -245,6 +247,17 @@ function renderHome() {
                 </div>
             </div>
 
+            <!-- 集合写真 -->
+            <div style="margin-bottom: 3rem; position: relative; border-radius: 16px; overflow: hidden; box-shadow: 0 0 40px rgba(99, 179, 237, 0.25), 0 8px 32px rgba(0,0,0,0.4);">
+                <img src="./images/group_photo.png" alt="WCP集合写真"
+                     style="width: 100%; max-height: 480px; object-fit: cover; object-position: center top; display: block;">
+                <div style="position: absolute; bottom: 0; left: 0; right: 0; padding: 1.2rem 1.5rem;
+                            background: linear-gradient(to top, rgba(10,10,26,0.85) 0%, transparent 100%);
+                            font-family: var(--font-heading); font-size: 1.1rem; color: rgba(255,255,255,0.8); letter-spacing: 0.1em;">
+                    WCP メンバー
+                </div>
+            </div>
+
             <div class="grid-2" style="margin-bottom: 4rem;">
                 <div>
                     <h3 style="font-family: var(--font-heading); font-size: 4rem; margin-bottom: 1rem; color: var(--accent-blue); line-height: 1;">理念</h3>
@@ -382,8 +395,10 @@ function renderOrgNodes(parentId, columnIndex) {
         
         const hasChildren = mockData.departments.some(d => String(getDeptParentId(d)) === String(deptId));
         
-        // VIEW MEMBERS ボタンは「非最下位層 かつ メンバーが存在する」場合に表示
-        const showMembersButton = hasMembers && hasChildren;
+        const unvisible = String(dept.members_unvisible || dept['members_unvisible'] || '').toUpperCase() === 'TRUE';
+        
+        // VIEW MEMBERS ボタンは「非最下位層 かつ メンバーが存在する かつ members_unvisibleがtrueでない」場合に表示
+        const showMembersButton = hasMembers && hasChildren && !unvisible;
         
         html += `
             <div class="tree-node-wrapper">
@@ -715,19 +730,29 @@ function renderRoster() {
     let contentHtml = '';
 
     if (currentRosterTab === 'members') {
+        let membersToRender = mockData.members;
+
         contentHtml = `
             <div style="display: flex; flex-direction: column; gap: 1.5rem;">
-                ${mockData.members.map(member => {
+                ${membersToRender.map(member => {
                     const depts = parseDepartmentIds(member.departmentIds || member.departmentids || member.departmentsIds || member.DepartmentsIds);
                     let deptBadgesHtml = '';
                     if (depts && depts.length > 0 && mockData.departments) {
                         deptBadgesHtml = depts.map(dept => {
                             const dData = mockData.departments.find(d => String(getDeptId(d)) === String(dept.id));
+                            if (dData && String(dData.members_unvisible || dData['members_unvisible'] || '').toUpperCase() === 'TRUE') return '';
+                            
                             const dName = dData ? getDeptName(dData) : dept.id;
                             const titleStr = dept.title ? ` / ${dept.title}` : '';
-                            return `<span class="badge" style="background: var(--surface-color); border: 1px solid var(--accent-blue);"><i class="fa-solid fa-folder-open"></i> ${dName}${titleStr}</span>`;
-                        }).join('');
+                            const isTarget = isEditMode;
+                            const delBtn = isTarget ? ` <i class="fa-solid fa-xmark" style="cursor:pointer; color:var(--accent-pink); margin-left:0.3rem;" onclick="event.stopPropagation(); deleteDepartment('${member.squadNumber}', '${dept.id}')"></i>` : '';
+                            return `<span class="badge" style="background: var(--surface-color); border: 1px solid var(--accent-blue);"><i class="fa-solid fa-folder-open"></i> ${dName}${titleStr}${delBtn}</span>`;
+                        }).filter(Boolean).join('');
                     }
+                    
+                    const isTarget = isEditMode;
+                    const addDeptBtn = isTarget ? `<button class="cyber-btn" style="padding: 0.2rem 0.5rem; font-size: 0.7rem; border-radius: 10px;" onclick="event.stopPropagation(); openEditDepartmentModal('${member.squadNumber}')"><i class="fa-solid fa-plus"></i> 役職編集</button>` : '';
+
                     return `
                     <div class="cyber-card member-card" style="cursor: pointer;" onclick="toggleMemberDetails('${member.squadNumber}')">
                         <div class="profile-header" style="margin-bottom: 0;">
@@ -738,8 +763,9 @@ function renderRoster() {
                                     <span>背番号: <span style="color: var(--text-main); font-weight: bold;">${member.squadNumber}</span></span>
                                     <span>カテゴリー: <span style="color: var(--text-main); font-weight: bold;">${member.category || '未登録'}</span></span>
                                 </div>
-                                <div class="badge-list" style="margin-top: 0.5rem;">
+                                <div class="badge-list" style="margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                                     ${deptBadgesHtml}
+                                    ${addDeptBtn}
                                 </div>
                             </div>
                             <div class="accordion-icon" id="icon-${member.squadNumber}" style="color: var(--accent-blue); font-size: 1.5rem; margin-right: 1rem; display: flex; align-items: center;">
@@ -754,9 +780,14 @@ function renderRoster() {
                                         return `<div style="text-align: center; margin: 1rem 0; width: 100%; font-weight: bold; color: var(--accent-blue); text-shadow: 1px 1px 0px var(--border-color); letter-spacing: 2px;"><i class="fa-solid fa-crown" style="color: gold;"></i> ★すべてのカテゴリー条件を達成しました！</div>`;
                                     }
                                     const reqs = nextCatInfo.requirements;
+                                    const isTarget = isEditMode;
                                     const iconsHtml = reqs.map(req => {
                                         const isCompleted = member[req.name] === true || member[req.name] === "TRUE";
-                                        return `<div class="task-icon ${isCompleted ? 'unlocked' : 'locked'}" data-tooltip="${req.name}"><i class="fa-solid ${req.icon}"></i></div>`;
+                                        if (isTarget) {
+                                            return `<div class="task-icon ${isCompleted ? 'unlocked' : 'locked'}" data-tooltip="${req.name}" style="cursor:pointer;" onclick="event.stopPropagation(); toggleCategoryProgress('${member.squadNumber}', '${req.name}', ${!isCompleted})"><i class="fa-solid ${req.icon}"></i></div>`;
+                                        } else {
+                                            return `<div class="task-icon ${isCompleted ? 'unlocked' : 'locked'}" data-tooltip="${req.name}"><i class="fa-solid ${req.icon}"></i></div>`;
+                                        }
                                     }).join('');
                                     return `
                                         <div style="display: flex; justify-content: space-between; width: 100%; align-items: center; margin-bottom: 0.5rem;">
@@ -781,8 +812,21 @@ function renderRoster() {
                             <div class="detail-row">
                                 <div style="flex: 1;">
                                     <h4 style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.3rem;">バッジ</h4>
-                                    <div class="badge-list">
-                                        ${member.badges && member.badges.length > 0 ? member.badges.map(badge => `<span class="badge">${badge}</span>`).join('') : '<span style="color: var(--text-muted); font-size: 0.8rem;">なし</span>'}
+                                    <div class="badge-list" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                        ${member.badges && member.badges.length > 0 ? member.badges.map(badge => {
+                                            const isTarget = isEditMode;
+                                            const delBtn = isTarget ? ` <i class="fa-solid fa-xmark" style="cursor:pointer; margin-left:0.3rem;" onclick="event.stopPropagation(); deleteBadge('${member.squadNumber}', '${badge}')"></i>` : '';
+                                            // Handle colors if badge format is Name(Color)
+                                            let bName = badge;
+                                            let bColor = 'var(--accent-blue)';
+                                            const match = badge.match(/(.*)\((#[0-9a-fA-F]{3,6}|[a-zA-Z]+)\)$/);
+                                            if (match) {
+                                                bName = match[1].trim();
+                                                bColor = match[2];
+                                            }
+                                            return `<span class="badge" style="color: ${bColor};">${bName}${delBtn}</span>`;
+                                        }).join('') : '<span style="color: var(--text-muted); font-size: 0.8rem;">なし</span>'}
+                                        ${isEditMode ? `<button class="cyber-btn" style="padding: 0.2rem 0.5rem; font-size: 0.7rem; border-radius: 10px;" onclick="event.stopPropagation(); openAddBadgeModal('${member.squadNumber}')"><i class="fa-solid fa-plus"></i> バッジ追加</button>` : ''}
                                     </div>
                                 </div>
                             </div>
@@ -794,7 +838,7 @@ function renderRoster() {
                                         ${(() => {
                                             const memberReviews = (mockData.reviews || []).filter(r => String(r.squadNumber) === String(member.squadNumber));
                                             if (memberReviews.length > 0) {
-                                                return memberReviews.map(rev => `<a href="${rev.docLink}" target="_blank" rel="noopener noreferrer" class="cyber-btn" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem;" onclick="event.stopPropagation();"><i class="fa-solid fa-file-lines"></i> ${rev.bookTitle}</a>`).join('');
+                                                return memberReviews.map(rev => `<button class="cyber-btn" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.3rem; border: none; cursor: pointer;" onclick="event.stopPropagation(); openDocViewerModal('${rev.docLink}', '${rev.bookTitle}')"><i class="fa-solid fa-file-lines"></i> ${rev.bookTitle}</button>`).join('');
                                             } else {
                                                 return '<span style="color: var(--text-muted); font-size: 0.8rem;">なし</span>';
                                             }
@@ -810,7 +854,11 @@ function renderRoster() {
                                     <div class="task-icons-container" style="margin-top: 0.5rem; gap: 0.5rem;">
                                         ${['K-01', 'K-02', 'K-03', 'K-04', 'K-05'].map((key, index) => {
                                             const isCompleted = member[key] === true || member[key] === "TRUE";
-                                            return `<div class="task-icon ${isCompleted ? 'unlocked' : 'locked'}" data-tooltip="課題図書${index + 1}" style="width: 35px; height: 35px; font-size: 1rem;"><i class="fa-solid fa-book"></i></div>`;
+                                            if (isEditMode) {
+                                                return `<div class="task-icon ${isCompleted ? 'unlocked' : 'locked'}" data-tooltip="課題図書${index + 1}" style="width: 35px; height: 35px; font-size: 1rem; cursor:pointer;" onclick="event.stopPropagation(); toggleCategoryProgress('${member.squadNumber}', '${key}', ${!isCompleted})"><i class="fa-solid fa-book"></i></div>`;
+                                            } else {
+                                                return `<div class="task-icon ${isCompleted ? 'unlocked' : 'locked'}" data-tooltip="課題図書${index + 1}" style="width: 35px; height: 35px; font-size: 1rem;"><i class="fa-solid fa-book"></i></div>`;
+                                            }
                                         }).join('')}
                                     </div>
                                 </div>
@@ -825,10 +873,20 @@ function renderRoster() {
         contentHtml = getOrganizationHtml();
     }
 
+    let editModeBtnHtml = '';
+    if (isEditMode) {
+        editModeBtnHtml = `<button class="cyber-btn" style="color: var(--accent-pink); border: 1px solid var(--accent-pink);" onclick="exitEditMode()"><i class="fa-solid fa-gear"></i> 編集モード終了</button>`;
+    } else {
+        editModeBtnHtml = `<button class="cyber-btn" onclick="openEditModeModal()"><i class="fa-solid fa-gear"></i> 編集モード</button>`;
+    }
+
     let html = `
         <div class="view-animate">
-            ${getBackButtonHtml()}
-            <h1 class="section-title">メンバー名簿</h1>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                ${getBackButtonHtml()}
+                ${editModeBtnHtml}
+            </div>
+            <h1 class="section-title" style="margin-bottom: 1rem;">メンバー名簿</h1>
             ${tabsHtml}
             ${contentHtml}
         </div>
@@ -1240,7 +1298,7 @@ function openReviewModal(bookId) {
             ${bookReviews.length > 0 ? bookReviews.map(review => `
                 <div class="timeline-item">
                     <div style="font-family: var(--font-heading); font-size: 0.8rem; color: var(--accent-green);">${review.date} - 背番号 ${review.reviewer}</div>
-                    <div style="margin-top: 0.5rem; font-size: 0.95rem; line-height: 1.4;">「${review.text}」</div>
+                    <div style="margin-top: 0.5rem; font-size: 1rem; line-height: 1.6; letter-spacing: 0.03em; white-space: pre-wrap; color: var(--text-main);">「${review.text}」</div>
                 </div>
             `).join('') : '<div style="color: var(--text-muted);">この本の履歴はまだありません。</div>'}
         </div>
@@ -1804,6 +1862,296 @@ async function submitAddReview() {
 }
 
 // ==========================================
+// EDIT MODE FUNCTIONS
+// ==========================================
+
+function openEditModeModal() {
+    const html = `
+        <h2 style="margin-bottom: 1.5rem; color: var(--accent-pink);"><i class="fa-solid fa-gear"></i> 編集モード</h2>
+        <div class="form-group">
+            <label>パスワード</label>
+            <input type="password" id="editModePassword" class="cyber-input">
+        </div>
+        <button class="cyber-btn" style="width: 100%; margin-top: 1rem;" onclick="submitEditMode()">編集モードに入る</button>
+    `;
+    openModal(html);
+}
+
+function submitEditMode() {
+    const pw = document.getElementById('editModePassword').value;
+
+    if (pw !== "20230914") {
+        alert("パスワードが違います。");
+        return;
+    }
+
+    isEditMode = true;
+    editModeTargetSquad = null;
+    closeModal();
+    renderRoster();
+}
+
+function exitEditMode() {
+    isEditMode = false;
+    editModeTargetSquad = null;
+    renderRoster();
+}
+
+async function toggleCategoryProgress(squadNum, reqName, newValue) {
+    const member = mockData.members.find(m => String(m.squadNumber) === String(squadNum));
+    if (!member) return;
+
+    // Send action to GAS
+    const success = await sendAction('updateMemberCategory', {
+        squadNum: squadNum,
+        fieldName: reqName,
+        newValue: newValue ? "TRUE" : "FALSE"
+    });
+
+    if (success) {
+        member[reqName] = newValue ? "TRUE" : "FALSE";
+        renderRoster();
+    } else {
+        alert("保存に失敗しました");
+    }
+}
+
+function openAddBadgeModal(squadNum) {
+    const html = `
+        <h2 style="margin-bottom: 1.5rem; color: var(--accent-blue);"><i class="fa-solid fa-medal"></i> バッジ追加</h2>
+        <div class="form-group">
+            <label>バッジ名</label>
+            <input type="text" id="addBadgeName" class="cyber-input" placeholder="例: HTMLマスター">
+        </div>
+        <div class="form-group">
+            <label>色 (カラーコードまたはカラー名)</label>
+            <input type="color" id="addBadgeColor" class="cyber-input" value="#63b3ed" style="height: 50px; padding: 0.5rem;">
+        </div>
+        <button class="cyber-btn" id="btn-add-badge" style="width: 100%; margin-top: 1rem;" onclick="submitAddBadge('${squadNum}')">追加</button>
+    `;
+    openModal(html);
+}
+
+async function submitAddBadge(squadNum) {
+    const name = document.getElementById('addBadgeName').value.trim();
+    const color = document.getElementById('addBadgeColor').value.trim();
+
+    if (!name) {
+        alert("バッジ名を入力してください");
+        return;
+    }
+
+    document.getElementById('btn-add-badge').disabled = true;
+    document.getElementById('btn-add-badge').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 保存中...';
+
+    const badgeStr = `${name}(${color})`;
+    const success = await sendAction('updateMemberBadge', {
+        squadNum: squadNum,
+        operation: 'add',
+        badgeStr: badgeStr
+    });
+
+    if (success) {
+        const member = mockData.members.find(m => String(m.squadNumber) === String(squadNum));
+        if (member) {
+            member.badges = member.badges || [];
+            member.badges.push(badgeStr);
+        }
+        closeModal();
+        renderRoster();
+    } else {
+        alert("保存に失敗しました");
+        document.getElementById('btn-add-badge').disabled = false;
+        document.getElementById('btn-add-badge').innerHTML = '追加';
+    }
+}
+
+async function deleteBadge(squadNum, badgeStr) {
+    if (!confirm(`バッジ「${badgeStr.replace(/\(.*?\)$/, '')}」を削除しますか？`)) return;
+
+    const success = await sendAction('updateMemberBadge', {
+        squadNum: squadNum,
+        operation: 'delete',
+        badgeStr: badgeStr
+    });
+
+    if (success) {
+        const member = mockData.members.find(m => String(m.squadNumber) === String(squadNum));
+        if (member && member.badges) {
+            member.badges = member.badges.filter(b => b !== badgeStr);
+        }
+        renderRoster();
+    } else {
+        alert("削除に失敗しました");
+    }
+}
+
+function openEditDepartmentModal(squadNum) {
+    const member = mockData.members.find(m => String(m.squadNumber) === String(squadNum));
+    const depts = member ? parseDepartmentIds(member.departmentIds || member.departmentids || member.departmentsIds || member.DepartmentsIds) : [];
+    
+    let deptListHtml = '';
+    if (depts.length > 0) {
+        deptListHtml = depts.map(dept => {
+            const dData = mockData.departments.find(d => String(getDeptId(d)) === String(dept.id));
+            const dName = dData ? getDeptName(dData) : dept.id;
+            const titleStr = dept.title ? ` / ${dept.title}` : '';
+            return `
+                <div style="display:flex; justify-content:space-between; align-items:center; background:var(--surface-color); padding:0.5rem 1rem; border-radius:10px; box-shadow:var(--shadow-in); margin-bottom:0.5rem;">
+                    <span>${dName}${titleStr}</span>
+                    <button class="cyber-btn danger" style="padding:0.2rem 0.5rem; font-size:0.8rem;" onclick="deleteDepartment('${squadNum}', '${dept.id}')"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            `;
+        }).join('');
+    } else {
+        deptListHtml = '<p style="color:var(--text-muted); font-size:0.9rem;">所属役職なし</p>';
+    }
+
+    const deptOptions = mockData.departments.map(d => `<option value="${getDeptId(d)}">${getDeptName(d)}</option>`).join('');
+
+    const html = `
+        <h2 style="margin-bottom: 1.5rem; color: var(--accent-blue);"><i class="fa-solid fa-folder-open"></i> 役職編集</h2>
+        <div style="margin-bottom: 1.5rem;">
+            <h4 style="margin-bottom: 0.5rem; font-size: 0.9rem;">現在の役職</h4>
+            ${deptListHtml}
+        </div>
+        <div style="border-top: 1px dashed var(--border-color); padding-top: 1.5rem;">
+            <h4 style="margin-bottom: 1rem; font-size: 0.9rem;">新規追加</h4>
+            <div class="form-group">
+                <label>部署/役職</label>
+                <select id="addDeptId" class="cyber-input">
+                    ${deptOptions}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>肩書 (任意)</label>
+                <input type="text" id="addDeptTitle" class="cyber-input" placeholder="例: リーダー">
+            </div>
+            <button class="cyber-btn" id="btn-add-dept" style="width: 100%; margin-top: 0.5rem;" onclick="submitAddDepartment('${squadNum}')">追加</button>
+        </div>
+    `;
+    openModal(html);
+}
+
+async function submitAddDepartment(squadNum) {
+    const deptId = document.getElementById('addDeptId').value;
+    const title = document.getElementById('addDeptTitle').value.trim();
+
+    if (!deptId) return;
+
+    document.getElementById('btn-add-dept').disabled = true;
+    document.getElementById('btn-add-dept').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 追加中...';
+
+    const success = await sendAction('updateMemberDepartment', {
+        squadNum: squadNum,
+        operation: 'add',
+        deptId: deptId,
+        title: title
+    });
+
+    if (success) {
+        // Need to refetch data to get correctly assigned parent departments, but for immediate UI:
+        // Let's just do a full page reload or refetch member data to be safe.
+        // Actually since we don't have a single user fetch, we'll mimic the parent assignment locally
+        // to avoid a full reload.
+        
+        let newDepts = [{ id: deptId, title: title }];
+        let currentParentId = mockData.departments.find(d => String(getDeptId(d)) === String(deptId))?.parentId;
+        while (currentParentId) {
+            newDepts.push({ id: currentParentId, title: '' });
+            currentParentId = mockData.departments.find(d => String(getDeptId(d)) === String(currentParentId))?.parentId;
+        }
+
+        const member = mockData.members.find(m => String(m.squadNumber) === String(squadNum));
+        if (member) {
+            let currentDepts = parseDepartmentIds(member.departmentIds || member.departmentids || member.departmentsIds || member.DepartmentsIds);
+            newDepts.forEach(nd => {
+                const exists = currentDepts.find(cd => String(cd.id) === String(nd.id));
+                if (exists) {
+                    if (nd.title && !exists.title) exists.title = nd.title;
+                } else {
+                    currentDepts.push(nd);
+                }
+            });
+            member.departmentIds = currentDepts.map(d => d.title ? `${d.id}(${d.title})` : d.id).join(',');
+        }
+
+        closeModal();
+        renderRoster();
+        // optionally reopen the modal so they can add more:
+        // setTimeout(() => openEditDepartmentModal(squadNum), 300);
+    } else {
+        alert("追加に失敗しました");
+        document.getElementById('btn-add-dept').disabled = false;
+        document.getElementById('btn-add-dept').innerHTML = '追加';
+    }
+}
+
+async function deleteDepartment(squadNum, deptId) {
+    if (!confirm("この役職を削除しますか？")) return;
+    
+    // In the modal, we might be clicking delete. If we are in the modal, we can show a loader or just close it.
+    const success = await sendAction('updateMemberDepartment', {
+        squadNum: squadNum,
+        operation: 'delete',
+        deptId: deptId
+    });
+
+    if (success) {
+        const member = mockData.members.find(m => String(m.squadNumber) === String(squadNum));
+        if (member) {
+            let currentDepts = parseDepartmentIds(member.departmentIds || member.departmentids || member.departmentsIds || member.DepartmentsIds);
+            currentDepts = currentDepts.filter(cd => String(cd.id) !== String(deptId));
+            member.departmentIds = currentDepts.map(d => d.title ? `${d.id}(${d.title})` : d.id).join(',');
+        }
+        
+        // Re-render
+        if(document.getElementById('modal-overlay').classList.contains('hidden') === false) {
+            // we are inside modal
+            openEditDepartmentModal(squadNum);
+            renderRoster();
+        } else {
+            renderRoster();
+        }
+    } else {
+        alert("削除に失敗しました");
+    }
+}
+
+// ==========================================
+// DOCUMENT VIEWER
+// ==========================================
+function closeDocViewerModal() {
+    document.getElementById('doc-viewer-overlay').classList.add('hidden');
+}
+
+async function openDocViewerModal(docLink, title) {
+    const overlay = document.getElementById('doc-viewer-overlay');
+    const titleEl = document.getElementById('doc-viewer-title');
+    const bodyEl = document.getElementById('doc-viewer-body');
+    
+    titleEl.innerHTML = `<i class="fa-solid fa-file-lines"></i> ${title}`;
+    bodyEl.innerHTML = `<div style="text-align:center; padding:2rem;"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><p style="margin-top:1rem;">データの取得中...</p></div>`;
+    
+    overlay.classList.remove('hidden');
+    
+    try {
+        const response = await fetch(GAS_API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'getDocText', docLink: docLink })
+        });
+        const result = await response.json();
+        
+        if (result.success && result.text) {
+            bodyEl.textContent = result.text; // TextContent escapes HTML safely
+        } else {
+            bodyEl.innerHTML = `<div style="color:var(--accent-pink); text-align:center; padding:2rem;"><i class="fa-solid fa-triangle-exclamation fa-2x"></i><p style="margin-top:1rem;">取得失敗: ${result.error || '不明なエラー'}</p></div>`;
+        }
+    } catch (e) {
+        bodyEl.innerHTML = `<div style="color:var(--accent-pink); text-align:center; padding:2rem;"><i class="fa-solid fa-triangle-exclamation fa-2x"></i><p style="margin-top:1rem;">通信エラー: ${e.message}</p></div>`;
+    }
+}
+
 // INIT
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {

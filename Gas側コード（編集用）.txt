@@ -38,6 +38,15 @@ function doPost(e) {
       editEvent(ss, params);
     } else if (action === 'updateMemberField') {
       updateMemberField(ss, params.squadNum, params.fieldName, params.newValue);
+    } else if (action === 'updateMemberCategory') {
+      updateMemberField(ss, params.squadNum, params.fieldName, params.newValue);
+    } else if (action === 'updateMemberBadge') {
+      updateMemberBadge(ss, params);
+    } else if (action === 'updateMemberDepartment') {
+      updateMemberDepartment(ss, params);
+    } else if (action === 'getDocText') {
+      return ContentService.createTextOutput(JSON.stringify(getDocText(params.docLink)))
+        .setMimeType(ContentService.MimeType.JSON);
     } else if (action === 'addReview') {
       addReview(ss, params);
     }
@@ -151,7 +160,7 @@ function addEvent(ss, params) {
   if (endTimeIndex !== -1) newRow[endTimeIndex] = params.endTime ? "'" + params.endTime : '';
   if (locationIndex !== -1) newRow[locationIndex] = params.location;
   if (colorIndex !== -1) newRow[colorIndex] = params.color ? "'" + params.color : "'#e0f2fe";
-  if (descIndex !== -1) newRow[descIndex] = "DEBUG: " + JSON.stringify(params);
+  if (descIndex !== -1) newRow[descIndex] = params.description || '';
   if (capIndex !== -1) newRow[capIndex] = (params.capacity === undefined || params.capacity === null) ? "" : params.capacity;
   if (hostIndex !== -1) newRow[hostIndex] = (params.host === undefined || params.host === null) ? "" : params.host;
   if (attendeesIndex !== -1) newRow[attendeesIndex] = params.attendees !== undefined ? params.attendees : '';
@@ -253,9 +262,9 @@ function updateMemberField(ss, squadNum, fieldName, newValue) {
   const sheet = ss.getSheetByName('Members');
   if (!sheet) throw new Error("Membersシートが見つかりません");
   const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const sqIndex = headers.indexOf('squadNumber');
-  const targetIndex = headers.indexOf(fieldName);
+  const headers = data[0].map(h => String(h).trim().toLowerCase());
+  const sqIndex = headers.indexOf('squadnumber');
+  const targetIndex = headers.indexOf(String(fieldName).trim().toLowerCase());
   
   if (sqIndex === -1 || targetIndex === -1) throw new Error("指定のカラムが見つかりません");
   
@@ -327,9 +336,119 @@ function addReview(ss, params) {
   }
 }
 
+// バッジの更新 (追加/削除)
+function updateMemberBadge(ss, params) {
+  const sheet = ss.getSheetByName('Members');
+  if (!sheet) throw new Error("Membersシートが見つかりません");
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0].map(h => String(h).trim().toLowerCase());
+  const sqIndex = headers.indexOf('squadnumber');
+  const targetIndex = headers.indexOf('badges');
+  
+  if (sqIndex === -1 || targetIndex === -1) throw new Error("指定のカラムが見つかりません");
+  
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][sqIndex]) === String(params.squadNum)) {
+      let currentVal = String(data[i][targetIndex] || '').trim();
+      let badges = currentVal ? currentVal.split(',').map(s => s.trim()).filter(Boolean) : [];
+      
+      if (params.operation === 'add') {
+        if (!badges.includes(params.badgeStr)) {
+          badges.push(params.badgeStr);
+        }
+      } else if (params.operation === 'delete') {
+        badges = badges.filter(b => b !== params.badgeStr);
+      }
+      
+      sheet.getRange(i + 1, targetIndex + 1).setValue(badges.join(','));
+      break;
+    }
+  }
+}
+
+// 役職の更新 (追加/削除) と親役職の自動付与
+function updateMemberDepartment(ss, params) {
+  const mSheet = ss.getSheetByName('Members');
+  const dSheet = ss.getSheetByName('Departments');
+  if (!mSheet || !dSheet) throw new Error("必要なシートが見つかりません");
+  
+  // 部署情報を読み込んで親IDマップを作成
+  const dData = dSheet.getDataRange().getValues();
+  const dHeaders = dData[0];
+  const dIdIndex = dHeaders.findIndex(h => h.toLowerCase() === 'id');
+  const dParentIdIndex = dHeaders.findIndex(h => h.toLowerCase() === 'parentid');
+  
+  const deptParents = {};
+  if (dIdIndex !== -1 && dParentIdIndex !== -1) {
+    for (let i = 1; i < dData.length; i++) {
+      let id = String(dData[i][dIdIndex] || '').trim();
+      let pid = String(dData[i][dParentIdIndex] || '').trim();
+      if (id) deptParents[id] = pid;
+    }
+  }
+
+  const mData = mSheet.getDataRange().getValues();
+  const mHeaders = mData[0].map(h => String(h).trim().toLowerCase());
+  const mSqIndex = mHeaders.indexOf('squadnumber');
+  const targetIndex = mHeaders.findIndex(h => h.includes('department') && h.includes('id'));
+  
+  if (mSqIndex === -1 || targetIndex === -1) throw new Error("Membersシートに指定のカラムが見つかりません (squadNumber=" + mSqIndex + ", deptId=" + targetIndex + ")");
+
+  for (let i = 1; i < mData.length; i++) {
+    if (String(mData[i][mSqIndex]) === String(params.squadNum)) {
+      let currentVal = String(mData[i][targetIndex] || '').trim();
+      let depts = currentVal ? currentVal.split(',').map(s => s.trim()).filter(Boolean) : [];
+      
+      if (params.operation === 'add') {
+        const newDeptId = String(params.deptId).trim();
+        const title = String(params.title || '').trim();
+        const formattedNewDept = title ? newDeptId + '(' + title + ')' : newDeptId;
+        
+        // 既存の同じIDを持つ役職を一旦削除（上書きのため）
+        depts = depts.filter(d => d.replace(/\(.*?\)$/, '').trim() !== newDeptId);
+        depts.push(formattedNewDept);
+        
+        // 親役職を再帰的に追加
+        let currentParentId = deptParents[newDeptId];
+        while (currentParentId) {
+          // すでにその親IDが含まれているかチェック
+          const exists = depts.some(d => d.replace(/\(.*?\)$/, '').trim() === currentParentId);
+          if (!exists) {
+            depts.push(currentParentId); // 肩書なしで追加
+          }
+          currentParentId = deptParents[currentParentId];
+        }
+      } else if (params.operation === 'delete') {
+        const delDeptId = String(params.deptId).trim();
+        depts = depts.filter(d => d.replace(/\(.*?\)$/, '').trim() !== delDeptId);
+      }
+      
+      mSheet.getRange(i + 1, targetIndex + 1).setValue(depts.join(','));
+      break;
+    }
+  }
+}
+
 // ==========================================
-// Google ドキュメント連携用 (将来の拡張用)
+// Google ドキュメント連携用
 // ==========================================
+function getDocText(docLink) {
+  try {
+    // URLからIDを抽出 (例: https://docs.google.com/document/d/1A2B3C4D5E/edit -> 1A2B3C4D5E)
+    const match = docLink.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    if (!match || !match[1]) {
+      return { success: false, error: "無効なドキュメントURLです" };
+    }
+    
+    const docId = match[1];
+    const doc = DocumentApp.openById(docId);
+    const text = doc.getBody().getText();
+    
+    return { success: true, text: text };
+  } catch (e) {
+    return { success: false, error: "ドキュメントを取得できませんでした。共有設定（リンクを知っている全員が閲覧可）を確認してください。詳細: " + e.message };
+  }
+}
 
 /**
  * 指定されたGoogleドキュメントのIDからテキスト内容を取得する関数

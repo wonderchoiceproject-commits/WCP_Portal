@@ -44,6 +44,8 @@ function doPost(e) {
       updateMemberBadge(ss, params);
     } else if (action === 'updateMemberDepartment') {
       updateMemberDepartment(ss, params);
+    } else if (action === 'batchUpdateMemberDepartments') {
+      batchUpdateMemberDepartments(ss, params.updates);
     } else if (action === 'getDocText') {
       return ContentService.createTextOutput(JSON.stringify(getDocText(params.docLink)))
         .setMimeType(ContentService.MimeType.JSON);
@@ -426,6 +428,77 @@ function updateMemberDepartment(ss, params) {
       mSheet.getRange(i + 1, targetIndex + 1).setValue(depts.join(','));
       break;
     }
+  }
+}
+
+// 一括で役職/部署を更新 (バッチ処理)
+function batchUpdateMemberDepartments(ss, updates) {
+  if (!updates || updates.length === 0) return;
+  
+  const mSheet = ss.getSheetByName('Members');
+  const dSheet = ss.getSheetByName('Departments');
+  if (!mSheet || !dSheet) throw new Error("必要なシートが見つかりません");
+  
+  const dData = dSheet.getDataRange().getValues();
+  const dHeaders = dData[0];
+  const dIdIndex = dHeaders.findIndex(h => h.toLowerCase() === 'id');
+  const dParentIdIndex = dHeaders.findIndex(h => h.toLowerCase() === 'parentid');
+  
+  const deptParents = {};
+  if (dIdIndex !== -1 && dParentIdIndex !== -1) {
+    for (let i = 1; i < dData.length; i++) {
+      let id = String(dData[i][dIdIndex] || '').trim();
+      let pid = String(dData[i][dParentIdIndex] || '').trim();
+      if (id) deptParents[id] = pid;
+    }
+  }
+
+  const mData = mSheet.getDataRange().getValues();
+  if (mData.length < 2) return;
+  const mHeaders = mData[0].map(h => String(h).trim().toLowerCase());
+  const mSqIndex = mHeaders.indexOf('squadnumber');
+  const targetIndex = mHeaders.findIndex(h => h.includes('department') && h.includes('id'));
+  
+  if (mSqIndex === -1 || targetIndex === -1) throw new Error("Membersシートに指定のカラムが見つかりません");
+
+  let hasChanges = false;
+  
+  updates.forEach(params => {
+    for (let i = 1; i < mData.length; i++) {
+      if (String(mData[i][mSqIndex]) === String(params.squadNum)) {
+        let currentVal = String(mData[i][targetIndex] || '').trim();
+        let depts = currentVal ? currentVal.split(',').map(s => s.trim()).filter(Boolean) : [];
+        
+        if (params.operation === 'add') {
+          const newDeptId = String(params.deptId).trim();
+          const title = String(params.title || '').trim();
+          const formattedNewDept = title ? newDeptId + '(' + title + ')' : newDeptId;
+          
+          depts = depts.filter(d => d.replace(/\(.*?\)$/, '').trim() !== newDeptId);
+          depts.push(formattedNewDept);
+          
+          let currentParentId = deptParents[newDeptId];
+          while (currentParentId) {
+            const exists = depts.some(d => d.replace(/\(.*?\)$/, '').trim() === currentParentId);
+            if (!exists) {
+              depts.push(currentParentId);
+            }
+            currentParentId = deptParents[currentParentId];
+          }
+        } else if (params.operation === 'delete') {
+          const delDeptId = String(params.deptId).trim();
+          depts = depts.filter(d => d.replace(/\(.*?\)$/, '').trim() !== delDeptId);
+        }
+        
+        mData[i][targetIndex] = depts.join(',');
+        hasChanges = true;
+        break;
+      }
+    }
+  });
+  
+  if (hasChanges) {
+    mSheet.getRange(2, 1, mData.length - 1, mData[0].length).setValues(mData.slice(1));
   }
 }
 

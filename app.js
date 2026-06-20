@@ -1,7 +1,7 @@
 // ==========================================
 // CONFIGURATION & STATE
 // ==========================================
-const GAS_API_URL = 'https://script.google.com/macros/s/AKfycby-CnqVM4N_qNgxUtYPJ8KEApNNz3DdgMhRpEHOiuIqCj_1k6nFq08UsuYPMfe-bV2Z/exec';
+const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbxA1ageD7krYeGWaodYPZ2bsCDdM7wwqDnpmWC18FEGZt8Z4dcEJrk8u9oBWtcO-AyH/exec';
 let currentView = 'home';
 let viewHistory = [];
 let isLoading = true;
@@ -19,6 +19,16 @@ let mockData = {
 let currentRosterTab = 'members';
 let isEditMode = false;
 let editModeTargetSquad = null;
+
+// Roster Filters
+let currentRosterSearch = '';
+let currentRosterFilterProject = '';
+let currentRosterFilterGeneration = '';
+let currentRosterFilterCategory = '';
+
+// Book Filters
+let currentBookSearch = '';
+let pendingOrgUpdates = [];
 
 // ==========================================
 // CATEGORY REQUIREMENTS
@@ -311,32 +321,55 @@ function renderHome() {
 }
 
 function renderBooks() {
+    let booksToRender = mockData.books;
+    if (currentBookSearch) {
+        const lowerSearch = currentBookSearch.toLowerCase();
+        booksToRender = booksToRender.filter(b => {
+            const titleMatch = b.title && b.title.toLowerCase().includes(lowerSearch);
+            const authorMatch = b.author && b.author.toLowerCase().includes(lowerSearch);
+            return titleMatch || authorMatch;
+        });
+    }
+
     let html = `
         <div class="view-animate">
             ${getBackButtonHtml()}
             <h1 class="section-title">図書管理</h1>
+            
+            <div class="cyber-card" style="margin-bottom: 1.5rem; padding: 1rem;">
+                <div style="font-size: 0.8rem; color: var(--accent-blue); margin-bottom: 0.3rem;"><i class="fa-solid fa-magnifying-glass"></i> 本の検索 (タイトル・著者)</div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="text" id="bookSearchInput" placeholder="本のタイトルや著者を入力..." value="${currentBookSearch}" 
+                           onkeydown="if(event.key === 'Enter') handleBookSearch(this.value)"
+                           style="flex: 1; width: 100%; background: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.5rem; border-radius: 4px; outline: none; transition: border-color 0.3s;"
+                           onfocus="this.style.borderColor='var(--accent-blue)'" onblur="this.style.borderColor='var(--border-color)'">
+                    <button class="cyber-btn" onclick="handleBookSearch(document.getElementById('bookSearchInput').value)" style="padding: 0.5rem 1rem;">検索</button>
+                </div>
+            </div>
+
             <div class="grid-3">
-                ${mockData.books.map(book => `
-                    <div class="cyber-card">
-                        <div class="book-cover">
-                            <i class="fa-solid fa-book-journal-whills"></i>
-                        </div>
-                        <div class="book-title">${book.title}</div>
-                        <div class="book-meta">${book.author}</div>
-                        
-                        <div style="margin-bottom: 1rem;">
-                            ${book.status === 'available' 
-                                ? `<span class="status-badge status-available">貸出可能</span>`
-                                : `<span class="status-badge status-borrowed">貸出中: ${book.borrower} (期限: ${book.dueDate})</span>`
-                            }
+                ${booksToRender.length === 0 ? '<div class="cyber-card" style="text-align:center; padding:2rem; color:var(--text-muted); grid-column: 1 / -1;">該当する本が見つかりませんでした</div>' : booksToRender.map(book => `
+                    <div class="cyber-card" style="display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <div class="book-title" style="margin-top: 0;">${book.title}</div>
+                            <div class="book-meta" style="margin-bottom: 1rem;">${book.author}</div>
                         </div>
                         
-                        <div style="display: flex; gap: 0.5rem;">
-                            ${book.status === 'available'
-                                ? `<button class="cyber-btn" style="flex: 1;" onclick="openBorrowModal('${book.id}')">借りる</button>`
-                                : `<button class="cyber-btn danger" style="flex: 1;" onclick="returnBook('${book.id}')">返却</button>`
-                            }
-                            <button class="cyber-btn" title="履歴を見る" onclick="openReviewModal('${book.id}')"><i class="fa-solid fa-clock-rotate-left"></i></button>
+                        <div>
+                            <div style="margin-bottom: 1rem;">
+                                ${book.status === 'available' 
+                                    ? `<span class="status-badge status-available">貸出可能</span>`
+                                    : `<span class="status-badge status-borrowed">貸出中: ${book.borrower} (期限: ${book.dueDate})</span>`
+                                }
+                            </div>
+                            
+                            <div style="display: flex; gap: 0.5rem;">
+                                ${book.status === 'available'
+                                    ? `<button class="cyber-btn" style="flex: 1;" onclick="openBorrowModal('${book.id}')">借りる</button>`
+                                    : `<button class="cyber-btn danger" style="flex: 1;" onclick="returnBook('${book.id}')">返却</button>`
+                                }
+                                <button class="cyber-btn" title="履歴を見る" onclick="openReviewModal('${book.id}')"><i class="fa-solid fa-clock-rotate-left"></i></button>
+                            </div>
                         </div>
                     </div>
                 `).join('')}
@@ -361,6 +394,134 @@ function getOrganizationHtml() {
         </div>
     `;
 }
+
+function getOrganizationEditHtml() {
+    let membersToRender = mockData.members || [];
+    if (currentRosterSearch) {
+        const lowerSearch = currentRosterSearch.toLowerCase();
+        membersToRender = membersToRender.filter(m => {
+            const nameMatch = m.name && m.name.toLowerCase().includes(lowerSearch);
+            const squadMatch = m.squadNumber && String(m.squadNumber).toLowerCase().includes(lowerSearch);
+            return nameMatch || squadMatch;
+        });
+    }
+
+    const membersHtml = membersToRender.map(m => `
+        <div class="member-drag-card" draggable="true" ondragstart="handleDragStart(event, '${m.squadNumber}')" style="background: var(--surface-color); border: 1px solid var(--border-color); padding: 0.5rem; margin-bottom: 0.5rem; border-radius: 4px; cursor: grab; display: flex; align-items: center; gap: 0.5rem; transition: transform 0.2s;">
+            <div class="avatar" style="width: 30px; height: 30px; font-size: 0.8rem; flex-shrink: 0;">${m.squadNumber}</div>
+            <div style="font-weight: bold; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${m.name}</div>
+        </div>
+    `).join('');
+
+    const orgHtml = getOrganizationHtml();
+
+    return `
+        <div style="display: flex; gap: 1rem; height: calc(100vh - 250px); min-height: 500px;">
+            <!-- Left Pane: Draggable Members -->
+            <div style="width: 250px; background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <div style="padding: 1rem; background: var(--surface-color); border-bottom: 1px solid var(--border-color);">
+                    <div style="font-size: 0.85rem; color: var(--accent-blue); margin-bottom: 0.5rem; font-weight: bold;"><i class="fa-solid fa-users"></i> アサイン用メンバー</div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="text" id="rosterSearchInputOrg" placeholder="名前や背番号..." value="${currentRosterSearch}" 
+                               onkeydown="if(event.key === 'Enter') handleRosterSearch(this.value)"
+                               style="flex: 1; width: 100%; background: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.4rem; border-radius: 4px; outline: none;">
+                        <button class="cyber-btn" onclick="handleRosterSearch(document.getElementById('rosterSearchInputOrg').value)" style="padding: 0.4rem 0.6rem;"><i class="fa-solid fa-search"></i></button>
+                    </div>
+                </div>
+                <div style="flex: 1; overflow-y: auto; padding: 1rem;">
+                    ${membersToRender.length === 0 ? '<div style="color: var(--text-muted); font-size: 0.85rem; text-align: center;">見つかりません</div>' : membersHtml}
+                </div>
+            </div>
+
+            <!-- Right Pane: Organization Tree -->
+            <div style="flex: 1; border: 1px dashed var(--accent-pink); border-radius: 8px; background: rgba(0,0,0,0.02); overflow: auto; position: relative;">
+                <div style="position: absolute; top: 1rem; right: 1rem; background: var(--accent-pink); color: #fff; padding: 0.3rem 0.8rem; border-radius: 12px; font-size: 0.8rem; font-weight: bold; pointer-events: none; z-index: 10;"><i class="fa-solid fa-arrows-up-down-left-right"></i> D&Dでアサイン可能</div>
+                ${orgHtml}
+            </div>
+        </div>
+    `;
+}
+
+window.handleDragStart = function(e, squadNum) {
+    e.dataTransfer.setData('text/plain', squadNum);
+    e.dataTransfer.effectAllowed = 'copy';
+};
+window.handleDragOver = function(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+};
+window.handleDragEnter = function(e) {
+    e.preventDefault();
+    const card = e.currentTarget;
+    card.style.boxShadow = '0 0 15px var(--accent-pink)';
+    card.style.borderColor = 'var(--accent-pink)';
+};
+window.handleDragLeave = function(e) {
+    const card = e.currentTarget;
+    card.style.boxShadow = '';
+    card.style.borderColor = '';
+};
+window.handleDrop = function(e, deptId) {
+    e.preventDefault();
+    e.stopPropagation(); // prevent onclick expand
+    const card = e.currentTarget;
+    card.style.boxShadow = '';
+    card.style.borderColor = '';
+    
+    const squadNum = e.dataTransfer.getData('text/plain');
+    if (!squadNum || !deptId) return;
+
+    const member = mockData.members.find(m => String(m.squadNumber) === String(squadNum));
+    if (!member) return;
+
+    let currentDepts = parseDepartmentIds(member.departmentIds || member.departmentids || member.departmentsIds || member.DepartmentsIds);
+    if (currentDepts.some(d => String(d.id) === String(deptId))) {
+        alert("すでにこのプロジェクト（または部署）に所属しています");
+        return;
+    }
+
+    pendingOrgUpdates.push({
+        squadNum: squadNum,
+        operation: 'add',
+        deptId: deptId,
+        title: ''
+    });
+
+    const dSheetParents = {};
+    if (mockData.departments) {
+        mockData.departments.forEach(d => {
+            const id = getDeptId(d);
+            const pid = getDeptParentId(d);
+            if (id) dSheetParents[id] = pid;
+        });
+    }
+
+    let currentParentId = deptId;
+    let deptIdsToAdd = [];
+    while (currentParentId) {
+        if (!currentDepts.some(d => String(d.id) === String(currentParentId))) {
+            deptIdsToAdd.push(currentParentId);
+        }
+        currentParentId = dSheetParents[currentParentId];
+    }
+
+    deptIdsToAdd.forEach(idToAdd => {
+        currentDepts.push({ id: idToAdd, title: '' });
+    });
+    
+    const newDeptsStr = currentDepts.map(d => {
+        if (d.title) return `${d.id}(${d.title})`;
+        return String(d.id);
+    }).join(',');
+
+    member.departmentIds = newDeptsStr;
+    if (member.hasOwnProperty('departmentids')) member.departmentids = newDeptsStr;
+    if (member.hasOwnProperty('departmentsIds')) member.departmentsIds = newDeptsStr;
+    if (member.hasOwnProperty('DepartmentsIds')) member.DepartmentsIds = newDeptsStr;
+
+    renderRoster();
+};
+
 
 function getDeptId(dept) {
     return dept.id || dept.ID || dept.Id || '';
@@ -400,9 +561,10 @@ function renderOrgNodes(parentId, columnIndex) {
         // VIEW MEMBERS ボタンは「非最下位層 かつ メンバーが存在する かつ members_unvisibleがtrueでない」場合に表示
         const showMembersButton = hasMembers && hasChildren && !unvisible;
         
+        const dropEvents = isEditMode ? `ondragover="handleDragOver(event)" ondragenter="handleDragEnter(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, '${deptId}')"` : '';
         html += `
             <div class="tree-node-wrapper">
-                <div class="org-folder-card tree-node-card" id="org-node-${deptId}" onclick="expandOrgNode('${deptId}', ${columnIndex}, this, ${hasChildren}, ${hasMembers}, false)">
+                <div class="org-folder-card tree-node-card" id="org-node-${deptId}" ${dropEvents} onclick="expandOrgNode('${deptId}', ${columnIndex}, this, ${hasChildren}, ${hasMembers}, false)">
                     <div class="org-folder-header">
                         <div class="org-folder-title">${deptName}</div>
                         ${showMembersButton ? `<button class="cyber-btn neon-btn" onclick="event.stopPropagation(); expandOrgNode('${deptId}', ${columnIndex}, this.closest('.org-folder-card'), ${hasChildren}, ${hasMembers}, true)">VIEW MEMBERS</button>` : ''}
@@ -711,6 +873,12 @@ function getAllDescendantDeptIds(parentId, visited = new Set()) {
     return ids;
 }
 
+window.handleRosterSearch = function(val) { currentRosterSearch = val; renderRoster(); };
+window.handleRosterFilterProject = function(val) { currentRosterFilterProject = val; renderRoster(); };
+window.handleRosterFilterGeneration = function(val) { currentRosterFilterGeneration = val; renderRoster(); };
+window.handleRosterFilterCategory = function(val) { currentRosterFilterCategory = val; renderRoster(); };
+window.handleBookSearch = function(val) { currentBookSearch = val; renderBooks(); };
+
 function renderRoster() {
     mockData.members = mockData.members || [];
     mockData.departments = mockData.departments || [];
@@ -730,11 +898,92 @@ function renderRoster() {
     let contentHtml = '';
 
     if (currentRosterTab === 'members') {
+        // Extract filter options dynamically
+        const uniqueCategories = [...new Set(mockData.members.map(m => m.category || '未登録'))].filter(Boolean);
+        const uniqueGenerations = [...new Set(mockData.members.map(m => m.squadNumber ? String(m.squadNumber).charAt(0) : '').filter(Boolean))].sort();
+        
+        // Extract projects from mockData.departments
+        const uniqueProjects = mockData.departments.map(d => ({
+            id: getDeptId(d),
+            name: getDeptName(d)
+        })).filter(p => p.id && p.name);
+
         let membersToRender = mockData.members;
 
+        // Apply Search Filter
+        if (currentRosterSearch) {
+            const lowerSearch = currentRosterSearch.toLowerCase();
+            membersToRender = membersToRender.filter(m => {
+                const nameMatch = m.name && m.name.toLowerCase().includes(lowerSearch);
+                const squadMatch = m.squadNumber && String(m.squadNumber).toLowerCase().includes(lowerSearch);
+                return nameMatch || squadMatch;
+            });
+        }
+
+        // Apply Project Filter
+        if (currentRosterFilterProject) {
+            membersToRender = membersToRender.filter(m => {
+                const depts = parseDepartmentIds(m.departmentIds || m.departmentids || m.departmentsIds || m.DepartmentsIds);
+                return depts.some(d => String(d.id) === currentRosterFilterProject);
+            });
+        }
+
+        // Apply Generation Filter
+        if (currentRosterFilterGeneration) {
+            membersToRender = membersToRender.filter(m => {
+                return m.squadNumber && String(m.squadNumber).charAt(0) === currentRosterFilterGeneration;
+            });
+        }
+
+        // Apply Category Filter
+        if (currentRosterFilterCategory) {
+            membersToRender = membersToRender.filter(m => {
+                const cat = m.category || '未登録';
+                return cat === currentRosterFilterCategory;
+            });
+        }
+
+        // Filter UI HTML
+        const filterHtml = `
+            <div class="cyber-card" style="margin-bottom: 1.5rem; padding: 1rem; display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;">
+                <div style="flex: 1; min-width: 200px;">
+                    <div style="font-size: 0.8rem; color: var(--accent-blue); margin-bottom: 0.3rem;"><i class="fa-solid fa-magnifying-glass"></i> 検索 (名前・背番号)</div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="text" id="rosterSearchInput" placeholder="名前または背番号を入力..." value="${currentRosterSearch}" 
+                               onkeydown="if(event.key === 'Enter') handleRosterSearch(this.value)"
+                               style="flex: 1; width: 100%; background: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.5rem; border-radius: 4px; outline: none; transition: border-color 0.3s;"
+                               onfocus="this.style.borderColor='var(--accent-blue)'" onblur="this.style.borderColor='var(--border-color)'">
+                        <button class="cyber-btn" onclick="handleRosterSearch(document.getElementById('rosterSearchInput').value)" style="padding: 0.5rem 1rem;">検索</button>
+                    </div>
+                </div>
+                <div style="flex: 1; min-width: 150px;">
+                    <div style="font-size: 0.8rem; color: var(--accent-blue); margin-bottom: 0.3rem;"><i class="fa-solid fa-folder"></i> プロジェクト</div>
+                    <select onchange="handleRosterFilterProject(this.value)" style="width: 100%; background: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.5rem; border-radius: 4px; outline: none; cursor: pointer;">
+                        <option value="">すべて</option>
+                        ${uniqueProjects.map(p => `<option value="${p.id}" ${currentRosterFilterProject === String(p.id) ? 'selected' : ''}>${p.name}</option>`).join('')}
+                    </select>
+                </div>
+                <div style="flex: 1; min-width: 100px;">
+                    <div style="font-size: 0.8rem; color: var(--accent-blue); margin-bottom: 0.3rem;"><i class="fa-solid fa-calendar-days"></i> 入会期</div>
+                    <select onchange="handleRosterFilterGeneration(this.value)" style="width: 100%; background: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.5rem; border-radius: 4px; outline: none; cursor: pointer;">
+                        <option value="">すべて</option>
+                        ${uniqueGenerations.map(g => `<option value="${g}" ${currentRosterFilterGeneration === g ? 'selected' : ''}>${g}期</option>`).join('')}
+                    </select>
+                </div>
+                <div style="flex: 1; min-width: 150px;">
+                    <div style="font-size: 0.8rem; color: var(--accent-blue); margin-bottom: 0.3rem;"><i class="fa-solid fa-layer-group"></i> カテゴリー</div>
+                    <select onchange="handleRosterFilterCategory(this.value)" style="width: 100%; background: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.5rem; border-radius: 4px; outline: none; cursor: pointer;">
+                        <option value="">すべて</option>
+                        ${uniqueCategories.map(c => `<option value="${c}" ${currentRosterFilterCategory === c ? 'selected' : ''}>${c}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+        `;
+
         contentHtml = `
+            ${filterHtml}
             <div style="display: flex; flex-direction: column; gap: 1.5rem;">
-                ${membersToRender.map(member => {
+                ${membersToRender.length === 0 ? '<div class="cyber-card" style="text-align:center; padding:2rem; color:var(--text-muted);">該当するメンバーが見つかりませんでした</div>' : membersToRender.map(member => {
                     const depts = parseDepartmentIds(member.departmentIds || member.departmentids || member.departmentsIds || member.DepartmentsIds);
                     let deptBadgesHtml = '';
                     if (depts && depts.length > 0 && mockData.departments) {
@@ -792,7 +1041,7 @@ function renderRoster() {
                                     return `
                                         <div style="display: flex; justify-content: space-between; width: 100%; align-items: center; margin-bottom: 0.5rem;">
                                             <h4 style="font-size: 0.8rem; color: var(--accent-blue); text-transform: uppercase; margin-bottom: 0;"><i class="fa-solid fa-turn-up"></i> Next Step: ${nextCatInfo.name}への道</h4>
-                                            <button class="cyber-btn member-edit-btn" onclick="event.stopPropagation(); openEditTasksModal('${member.squadNumber}', '${member.category}')"><i class="fa-solid fa-list-check"></i> 進捗更新</button>
+                                            ${isEditMode ? '<span style="font-size: 0.75rem; color: var(--accent-pink);"><i class="fa-solid fa-hand-pointer"></i> アイコンをタップして切替</span>' : ''}
                                         </div>
                                         <div class="task-icons-container">
                                             ${iconsHtml}
@@ -870,7 +1119,11 @@ function renderRoster() {
             </div>
         `;
     } else if (currentRosterTab === 'organization') {
-        contentHtml = getOrganizationHtml();
+        if (isEditMode) {
+            contentHtml = getOrganizationEditHtml();
+        } else {
+            contentHtml = getOrganizationHtml();
+        }
     }
 
     let editModeBtnHtml = '';
@@ -1688,58 +1941,7 @@ async function submitMemberEdit(squadNum, fieldName) {
 // ==========================================
 // TASKS EDIT MODAL & ACTIONS
 // ==========================================
-function openEditTasksModal(squadNum, currentCategory) {
-    const member = mockData.members.find(m => String(m.squadNumber) === String(squadNum));
-    const nextCatInfo = getNextCategoryInfo(currentCategory);
-    if (!nextCatInfo || !member) return;
-    
-    const reqs = nextCatInfo.requirements;
-    const completedTasks = member.completedTasks || [];
-    
-    let checkboxesHtml = reqs.map((req, index) => {
-        const isChecked = completedTasks.includes(req.name) ? 'checked' : '';
-        return `
-            <label style="display: flex; align-items: center; gap: 0.8rem; padding: 0.8rem; background: #ffffff; border: var(--border-width) solid var(--border-color); border-radius: 8px; margin-bottom: 0.8rem; cursor: pointer; transition: all var(--transition-speed); box-shadow: 2px 2px 0px rgba(0,0,0,0.1);">
-                <input type="checkbox" class="task-checkbox" value="${req.name}" ${isChecked} style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--accent-blue);">
-                <div style="width: 30px; text-align: center; font-size: 1.2rem; color: var(--accent-blue);">
-                    <i class="fa-solid ${req.icon}"></i>
-                </div>
-                <span style="font-size: 0.95rem; font-weight: 700; flex: 1;">${req.name}</span>
-            </label>
-        `;
-    }).join('');
 
-    let html = `
-        <h2 style="margin-bottom: 1rem; color: var(--accent-blue);"><i class="fa-solid fa-list-check"></i> 進捗の更新</h2>
-        <p style="margin-bottom: 1.5rem;">背番号: <strong>${squadNum}</strong> <br>目標: <strong style="color: var(--accent-green);">${nextCatInfo.name}</strong></p>
-        
-        <div class="tasks-list" style="max-height: 400px; overflow-y: auto; padding-right: 0.5rem; margin-bottom: 1rem;">
-            ${checkboxesHtml}
-        </div>
-        
-        <button class="cyber-btn" id="btn-edit-tasks" style="width: 100%; margin-top: 1rem;" onclick="submitTasksEdit('${squadNum}')">進捗を保存</button>
-    `;
-    openModal(html);
-}
-
-async function submitTasksEdit(squadNum) {
-    const checkboxes = document.querySelectorAll('.task-checkbox');
-    const selectedTasks = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
-    const newValue = selectedTasks.join(',');
-    
-    document.getElementById('btn-edit-tasks').disabled = true;
-    document.getElementById('btn-edit-tasks').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 保存中...';
-    
-    const success = await sendAction('updateMemberField', { squadNum, fieldName: 'completedTasks', newValue });
-    if (success) {
-        const member = mockData.members.find(m => String(m.squadNumber) === String(squadNum));
-        if (member) {
-            member.completedTasks = selectedTasks;
-        }
-        navigateTo(currentView);
-        closeModal();
-    }
-}
 
 // ==========================================
 // ADD REVIEW MODAL & ACTIONS
@@ -1891,7 +2093,29 @@ function submitEditMode() {
     renderRoster();
 }
 
-function exitEditMode() {
+async function exitEditMode() {
+    if (pendingOrgUpdates.length > 0) {
+        const overlay = document.getElementById('loading-overlay') || document.createElement('div');
+        if (!document.getElementById('loading-overlay')) {
+            overlay.id = 'loading-overlay';
+            overlay.className = 'modal-overlay';
+            overlay.innerHTML = '<div style="color:#fff; text-align:center; margin-top:20vh;"><i class="fa-solid fa-spinner fa-spin fa-3x"></i><p style="margin-top:1rem; font-size:1.2rem;">組織の変更を保存中...</p></div>';
+            document.body.appendChild(overlay);
+        }
+        overlay.classList.remove('hidden');
+
+        const success = await sendAction('batchUpdateMemberDepartments', { updates: pendingOrgUpdates });
+        if (success) {
+            pendingOrgUpdates = [];
+            await fetchPortalData();
+            overlay.classList.add('hidden');
+        } else {
+            alert("一括保存に失敗しました");
+            overlay.classList.add('hidden');
+            return;
+        }
+    }
+
     isEditMode = false;
     editModeTargetSquad = null;
     renderRoster();

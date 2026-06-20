@@ -13,6 +13,152 @@
     <link rel="stylesheet" href="index.css">
 </head>
 <body>
+    <!-- Dynamic Typography Loading Screen -->
+    <div id="dynamic-loader" class="dynamic-loader-overlay">
+        <!-- Background floating shapes -->
+        <div class="floating-clay shape1"></div>
+        <div class="floating-clay shape2"></div>
+        <div class="floating-clay shape3"></div>
+        
+        <!-- Letters container for physics bounce -->
+        <div id="physics-letters-container"></div>
+    </div>
+    
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const words = ["WONDER", "CHOICE", "PROJECT"];
+            const container = document.getElementById("physics-letters-container");
+            const overlay = document.getElementById("dynamic-loader");
+            if (!container || !overlay) return;
+            
+            const particles = [];
+            const radius = 30; // 60x60 block size -> 30px radius
+            
+            // 1. Arrange letters into words initially
+            words.forEach((wordText) => {
+                const group = document.createElement("div");
+                group.className = "word-group";
+                for (let i = 0; i < wordText.length; i++) {
+                    const el = document.createElement("div");
+                    el.className = "clay-letter";
+                    el.textContent = wordText[i];
+                    group.appendChild(el);
+                    particles.push({ el: el });
+                }
+                container.appendChild(group);
+            });
+            
+            // 2. Wait for entrance animation to finish, then EXPLODE!
+            setTimeout(() => {
+                // Check if already completely faded out
+                const overlayOpacity = parseFloat(window.getComputedStyle(overlay).opacity);
+                if (overlayOpacity <= 0) return;
+                
+                // Capture exact positions on screen
+                particles.forEach(p => {
+                    const rect = p.el.getBoundingClientRect();
+                    p.x = rect.left + rect.width / 2;
+                    p.y = rect.top + rect.height / 2;
+                    p.radius = radius;
+                    p.mass = 1;
+                    
+                    // Assign velocity exploding outwards from the center of the screen
+                    const cx = window.innerWidth / 2;
+                    const cy = window.innerHeight / 2;
+                    const angle = Math.atan2(p.y - cy, p.x - cx) + (Math.random() - 0.5) * 0.5;
+                    const speed = 7 + Math.random() * 5;
+                    p.vx = Math.cos(angle) * speed;
+                    p.vy = Math.sin(angle) * speed;
+                });
+                
+                // Detach from flexbox, attach to overlay with absolute positioning
+                particles.forEach(p => {
+                    p.el.style.animation = 'none'; // Stop CSS animation to allow JS transform
+                    overlay.appendChild(p.el);
+                    p.el.style.position = 'absolute';
+                    p.el.style.left = '0px';
+                    p.el.style.top = '0px';
+                    p.el.style.margin = '0px';
+                    p.el.style.transform = `translate(${p.x - p.radius}px, ${p.y - p.radius}px)`;
+                });
+                
+                // Remove the empty flex containers
+                if (container.parentNode) {
+                    container.parentNode.removeChild(container);
+                }
+                
+                // 3. Start Physics Loop
+                let animationId;
+                function update() {
+                    const currentOpacity = parseFloat(window.getComputedStyle(overlay).opacity);
+                    if (currentOpacity <= 0) {
+                        cancelAnimationFrame(animationId);
+                        return;
+                    }
+                    
+                    const width = window.innerWidth;
+                    const height = window.innerHeight;
+                    
+                    for (let i = 0; i < particles.length; i++) {
+                        let p = particles[i];
+                        p.x += p.vx;
+                        p.y += p.vy;
+                        
+                        // Edge bounce
+                        if (p.x - p.radius < 0) { p.x = p.radius; p.vx *= -1; }
+                        if (p.x + p.radius > width) { p.x = width - p.radius; p.vx *= -1; }
+                        if (p.y - p.radius < 0) { p.y = p.radius; p.vy *= -1; }
+                        if (p.y + p.radius > height) { p.y = height - p.radius; p.vy *= -1; }
+                        
+                        p.el.style.transform = `translate(${p.x - p.radius}px, ${p.y - p.radius}px)`;
+                    }
+                    
+                    // Particle-Particle Elastic Collisions
+                    for (let i = 0; i < particles.length; i++) {
+                        for (let j = i + 1; j < particles.length; j++) {
+                            let p1 = particles[i];
+                            let p2 = particles[j];
+                            let dx = p2.x - p1.x;
+                            let dy = p2.y - p1.y;
+                            let distSq = dx*dx + dy*dy;
+                            let minDist = p1.radius + p2.radius;
+                            
+                            if (distSq < minDist * minDist) {
+                                let dist = Math.sqrt(distSq);
+                                if(dist === 0) { dx = 1; dist = 1; }
+                                
+                                let nx = dx / dist;
+                                let ny = dy / dist;
+                                
+                                let rvx = p2.vx - p1.vx;
+                                let rvy = p2.vy - p1.vy;
+                                let velAlongNormal = rvx * nx + rvy * ny;
+                                
+                                if (velAlongNormal < 0) {
+                                    let impulse = -(1 + 1) * velAlongNormal / (1/p1.mass + 1/p2.mass);
+                                    let impulseX = impulse * nx;
+                                    let impulseY = impulse * ny;
+                                    
+                                    p1.vx -= impulseX / p1.mass;
+                                    p1.vy -= impulseY / p1.mass;
+                                    p2.vx += impulseX / p2.mass;
+                                    p2.vy += impulseY / p2.mass;
+                                    
+                                    let overlap = minDist - dist;
+                                    p1.x -= nx * overlap * 0.5;
+                                    p1.y -= ny * overlap * 0.5;
+                                    p2.x += nx * overlap * 0.5;
+                                    p2.y += ny * overlap * 0.5;
+                                }
+                            }
+                        }
+                    }
+                    animationId = requestAnimationFrame(update);
+                }
+                animationId = requestAnimationFrame(update);
+            }, 1200); // Wait 1.2s before exploding
+        });
+    </script>
     <!-- Background removed for claymorphism -->
 
     <header class="topbar">

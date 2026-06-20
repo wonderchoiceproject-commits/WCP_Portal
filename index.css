@@ -1,20 +1,25 @@
 :root {
-    --bg-color: #f4f7fa; /* Soft off-white for clay bg */
-    --surface-color: #f4f7fa; /* Same as bg for claymorphism base */
+    --bg-color: #f4f7fa;
+    /* Soft off-white for clay bg */
+    --surface-color: #f4f7fa;
+    /* Same as bg for claymorphism base */
     --text-main: #4a5568;
     --text-muted: #a0aec0;
-    --accent-yellow: #ffdb4d; /* Pop yellow */
+    --accent-yellow: #ffdb4d;
+    /* Pop yellow */
     --accent-yellow-dark: #e6c229;
     --accent-blue: #63b3ed;
     --accent-pink: #fc8181;
     --accent-green: #68d391;
     --border-color: #e2e8f0;
-    --border-width: 0px; /* No hard borders in clay */
+    --border-width: 0px;
+    /* No hard borders in clay */
     --font-heading: 'Zen Maru Gothic', sans-serif;
     --font-body: 'Zen Maru Gothic', sans-serif;
-    --font-mono: 'Nunito', sans-serif; /* Keep it round */
+    --font-mono: 'Nunito', sans-serif;
+    /* Keep it round */
     --transition-speed: 0.3s;
-    
+
     /* Clay Shadows */
     --shadow-out: 8px 8px 16px rgba(163, 177, 198, 0.4), -8px -8px 16px rgba(255, 255, 255, 0.9);
     --shadow-in: inset 4px 4px 8px rgba(163, 177, 198, 0.4), inset -4px -4px 8px rgba(255, 255, 255, 0.9);
@@ -42,7 +47,13 @@ body {
 }
 
 /* Typography */
-h1, h2, h3, h4, h5, h6, .font-heading {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.font-heading {
     font-family: var(--font-heading);
     font-weight: 800;
 }
@@ -156,7 +167,7 @@ h1, h2, h3, h4, h5, h6, .font-heading {
 }
 
 /* Clay Cards */
-.cyber-card { 
+.cyber-card {
     background: var(--surface-color);
     border: none;
     border-radius: 30px;
@@ -210,6 +221,7 @@ h1, h2, h3, h4, h5, h6, .font-heading {
 .cyber-btn.danger {
     color: var(--accent-pink);
 }
+
 .cyber-btn.danger:hover {
     color: #e53e3e;
 }
@@ -260,7 +272,7 @@ h1, h2, h3, h4, h5, h6, .font-heading {
     line-height: 1;
     padding-right: 5vw;
     font-weight: 900;
-    text-shadow: 2px 2px 0px rgba(0,0,0,0.1);
+    text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.1);
 }
 
 .marquee-content {
@@ -269,8 +281,13 @@ h1, h2, h3, h4, h5, h6, .font-heading {
 }
 
 @keyframes marquee {
-    0%   { transform: translateX(0); }
-    100% { transform: translateX(-50%); }
+    0% {
+        transform: translateX(0);
+    }
+
+    100% {
+        transform: translateX(-50%);
+    }
 }
 
 /* Menus */
@@ -356,9 +373,11 @@ h1, h2, h3, h4, h5, h6, .font-heading {
     border-radius: 20px;
     box-shadow: var(--shadow-in);
 }
+
 .news-item:last-child {
     margin-bottom: 0;
 }
+
 .news-date {
     font-size: 0.9rem;
     color: var(--accent-blue);
@@ -564,8 +583,15 @@ h1, h2, h3, h4, h5, h6, .font-heading {
 
 /* Animations */
 @keyframes popIn {
-    0% { opacity: 0; transform: translateY(20px) scale(0.95); }
-    100% { opacity: 1; transform: translateY(0) scale(1); }
+    0% {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
 
 .view-animate {
@@ -586,9 +612,11 @@ h1, h2, h3, h4, h5, h6, .font-heading {
 .event-attendees::-webkit-scrollbar {
     width: 6px;
 }
+
 .event-attendees::-webkit-scrollbar-track {
     background: transparent;
 }
+
 .event-attendees::-webkit-scrollbar-thumb {
     background: var(--text-muted);
     border-radius: 10px;
@@ -727,7 +755,7 @@ h1, h2, h3, h4, h5, h6, .font-heading {
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.2s ease;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     z-index: 10;
 }
 
@@ -740,13 +768,14 @@ h1, h2, h3, h4, h5, h6, .font-heading {
     body {
         font-size: 0.95rem;
     }
+
     .topbar {
         flex-direction: column;
         gap: 1rem;
         padding: 1rem;
         border-radius: 0 0 20px 20px;
     }
-    
+
     .main-nav {
         width: 100%;
         overflow-x: auto;
@@ -760,8 +789,9 @@ h1, h2, h3, h4, h5, h6, .font-heading {
         font-size: 0.95rem;
         padding: 0.5rem 1rem;
     }
-    
-    .grid-2, .grid-3 {
+
+    .grid-2,
+    .grid-3 {
         grid-template-columns: 1fr;
         gap: 1.5rem;
     }
@@ -785,16 +815,16 @@ h1, h2, h3, h4, h5, h6, .font-heading {
         margin: 1.5rem auto;
         padding: 0 1rem;
     }
-    
+
     .section-title {
         font-size: 2.2rem;
         margin-bottom: 1.5rem;
     }
-    
+
     .pop-text {
         font-size: 2.5rem;
     }
-    
+
     .typo-menu-item {
         font-size: 1.1rem;
         padding: 1rem;
@@ -843,7 +873,7 @@ h1, h2, h3, h4, h5, h6, .font-heading {
     }
 
     /* Override inline styles for large headings on mobile */
-    h2[style*="font-size: 3.5rem"], 
+    h2[style*="font-size: 3.5rem"],
     h3[style*="font-size: 4rem"] {
         font-size: 1.8rem !important;
         margin-bottom: 0.8rem !important;
@@ -895,9 +925,9 @@ h1, h2, h3, h4, h5, h6, .font-heading {
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.color-option input[type="radio"]:checked ~ .color-circle {
+.color-option input[type="radio"]:checked~.color-circle {
     transform: scale(1.15);
-    box-shadow: inset 2px 2px 5px rgba(0,0,0,0.1), inset -3px -3px 7px rgba(255,255,255,0.7), 0 0 0 3px var(--accent-blue);
+    box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.1), inset -3px -3px 7px rgba(255, 255, 255, 0.7), 0 0 0 3px var(--accent-blue);
 }
 
 .color-option:hover .color-circle {
@@ -905,15 +935,37 @@ h1, h2, h3, h4, h5, h6, .font-heading {
 }
 
 /* Pastel Colors */
-.bg-pastel-pink { background-color: #ffdee9 !important; color: #333 !important; }
-.bg-pastel-blue { background-color: #e0f2fe !important; color: #333 !important; }
-.bg-pastel-green { background-color: #f0fdf4 !important; color: #333 !important; }
-.bg-pastel-yellow { background-color: #fef9c3 !important; color: #333 !important; }
+.bg-pastel-pink {
+    background-color: #ffdee9 !important;
+    color: #333 !important;
+}
+
+.bg-pastel-blue {
+    background-color: #e0f2fe !important;
+    color: #333 !important;
+}
+
+.bg-pastel-green {
+    background-color: #f0fdf4 !important;
+    color: #333 !important;
+}
+
+.bg-pastel-yellow {
+    background-color: #fef9c3 !important;
+    color: #333 !important;
+}
 
 /* Highlight event card animation */
 @keyframes highlightFlash {
-    0% { box-shadow: 0 0 0 4px var(--accent-blue); transform: scale(1.02); }
-    100% { box-shadow: var(--shadow-out); transform: scale(1); }
+    0% {
+        box-shadow: 0 0 0 4px var(--accent-blue);
+        transform: scale(1.02);
+    }
+
+    100% {
+        box-shadow: var(--shadow-out);
+        transform: scale(1);
+    }
 }
 
 .highlight-event {
@@ -942,13 +994,14 @@ h1, h2, h3, h4, h5, h6, .font-heading {
 }
 
 .calendar-cell:hover {
-    background: rgba(0,0,0,0.02);
+    background: rgba(0, 0, 0, 0.02);
 }
 
 @media (max-width: 768px) {
     .calendar-grid {
         gap: 2px;
     }
+
     .calendar-cell {
         min-height: 70px;
         padding: 0.2rem;
@@ -962,23 +1015,27 @@ h1, h2, h3, h4, h5, h6, .font-heading {
     display: flex;
     overflow-x: auto;
     align-items: flex-start;
-    gap: 4rem; /* Width of connection lines */
+    gap: 4rem;
+    /* Width of connection lines */
     padding: 2rem;
     min-height: 50vh;
     scroll-behavior: smooth;
     background: rgba(0, 0, 0, 0.1);
     border-radius: 12px;
     border: 1px solid rgba(0, 255, 204, 0.1);
-    position: relative; /* SVGオーバーレイのアンカー */
+    position: relative;
+    /* SVGオーバーレイのアンカー */
 }
 
 .horizontal-tree-wrapper::-webkit-scrollbar {
     height: 8px;
 }
+
 .horizontal-tree-wrapper::-webkit-scrollbar-track {
-    background: rgba(0,0,0,0.2);
+    background: rgba(0, 0, 0, 0.2);
     border-radius: 4px;
 }
+
 .horizontal-tree-wrapper::-webkit-scrollbar-thumb {
     background: var(--accent-blue);
     border-radius: 4px;
@@ -989,13 +1046,23 @@ h1, h2, h3, h4, h5, h6, .font-heading {
     flex-direction: column;
     gap: 1.5rem;
     position: relative;
-    z-index: 1; /* SVG(z-index:0)より前面にカードを描画 */
+    z-index: 1;
+    /* SVG(z-index:0)より前面にカードを描画 */
     animation: slideInRight 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
 
 @keyframes slideInRight {
-    from { opacity: 0; transform: translateX(20px); }
-    to   { opacity: 1; transform: none; } /* noneにすることでアニメ完了後にスタッキングコンテキストを解除 */
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+
+    /* noneにすることでアニメ完了後にスタッキングコンテキストを解除 */
 }
 
 /* Vertical/horizontal connection lines are drawn by JS via SVG overlay. */
@@ -1025,7 +1092,8 @@ h1, h2, h3, h4, h5, h6, .font-heading {
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05), inset 0 0 10px rgba(72, 187, 120, 0.1);
 }
 
-.member-list-card:hover, .member-list-card.active {
+.member-list-card:hover,
+.member-list-card.active {
     border-color: var(--accent-green);
     box-shadow: 0 0 20px rgba(72, 187, 120, 0.5), inset 0 0 15px rgba(72, 187, 120, 0.2);
 }
@@ -1048,15 +1116,25 @@ h1, h2, h3, h4, h5, h6, .font-heading {
 }
 
 /* Custom Scrollbar for member list */
-.member-list-content::-webkit-scrollbar { width: 6px; }
-.member-list-content::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 3px; }
-.member-list-content::-webkit-scrollbar-thumb { background: rgba(72, 187, 120, 0.5); border-radius: 3px; }
+.member-list-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.member-list-content::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 3px;
+}
+
+.member-list-content::-webkit-scrollbar-thumb {
+    background: rgba(72, 187, 120, 0.5);
+    border-radius: 3px;
+}
 
 .member-item {
     display: flex;
     align-items: center;
     padding: 0.6rem;
-    background: rgba(0,0,0,0.2);
+    background: rgba(0, 0, 0, 0.2);
     border-radius: 8px;
     transition: all 0.2s;
     cursor: pointer;
@@ -1076,11 +1154,13 @@ h1, h2, h3, h4, h5, h6, .font-heading {
     transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     cursor: pointer;
     position: relative;
-    z-index: 2;  /* SVG（z-index:1）より前面に来るので背景色が線を隠す */
+    z-index: 2;
+    /* SVG（z-index:1）より前面に来るので背景色が線を隠す */
     overflow: visible;
 }
 
-.org-folder-card:hover, .org-folder-card.active {
+.org-folder-card:hover,
+.org-folder-card.active {
     box-shadow: 0 0 20px rgba(99, 179, 237, 0.5), inset 0 0 15px rgba(99, 179, 237, 0.2);
     border-color: var(--accent-green);
     transform: translateY(-2px);
@@ -1171,19 +1251,211 @@ h1, h2, h3, h4, h5, h6, .font-heading {
     white-space: pre-wrap;
     word-wrap: break-word;
     font-family: var(--font-body);
-    box-shadow: inset 0 0 15px rgba(0,0,0,0.5);
+    box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.5);
     scrollbar-width: thin;
-    scrollbar-color: var(--accent-blue) rgba(0,0,0,0.3);
+    scrollbar-color: var(--accent-blue) rgba(0, 0, 0, 0.3);
 }
 
 .doc-viewer-body::-webkit-scrollbar {
     width: 8px;
 }
+
 .doc-viewer-body::-webkit-scrollbar-track {
-    background: rgba(0,0,0,0.3);
+    background: rgba(0, 0, 0, 0.3);
     border-radius: 4px;
 }
+
 .doc-viewer-body::-webkit-scrollbar-thumb {
     background: var(--accent-blue);
     border-radius: 4px;
+}
+
+/* ==========================================
+   Claymorphism Animations Additions
+   ========================================== */
+/* 1. 滑らかなトランジションの適用 */
+.cyber-card,
+.cyber-btn,
+.nav-btn,
+.schedule-tab-btn,
+button,
+.task-icon,
+.typo-menu-item,
+.book-cover,
+.member-card,
+.roster-card,
+.book-card,
+.nav-tab,
+.condition-icon {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* 2. ホバー時の「浮遊感」演出（カード要素） */
+.cyber-card:hover,
+.typo-menu-item:hover,
+.roster-card:hover,
+.book-card:hover {
+    transform: translateY(-5px) !important;
+    box-shadow: 10px 10px 30px #d1d9e6, -10px -10px 30px #ffffff !important;
+}
+
+/* 3. クリック時の「押し込み（ムニュッ）」演出 */
+button:active,
+.cyber-btn:active,
+.nav-btn:active,
+.schedule-tab-btn:active,
+.cyber-card:active,
+.typo-menu-item:active,
+.roster-card:active,
+.nav-tab:active {
+    transform: scale(0.97) !important;
+    box-shadow: inset 2px 2px 5px #d1d9e6, inset -2px -2px 5px #ffffff !important;
+}
+
+/* ==========================================
+   Dynamic Typography Loader Overlay
+   ========================================== */
+.dynamic-loader-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: var(--bg-color);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Data loaded or error -> hide overlay smoothly */
+body:has(#app-root .view-animate) .dynamic-loader-overlay,
+body:has(#app-root .fa-triangle-exclamation) .dynamic-loader-overlay {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+}
+
+/* Hide the old app.js spinner to prevent it from flashing or showing behind transparent elements */
+#app-root .fa-spinner {
+    display: none !important;
+}
+
+#app-root div:has(> .fa-spinner) {
+    display: none !important;
+}
+
+/* Background floating shapes */
+.floating-clay {
+    position: absolute;
+    border-radius: 50%;
+    /* Soft translucent clay look */
+    background: rgba(255, 255, 255, 0.4);
+    box-shadow:
+        10px 10px 30px rgba(163, 177, 198, 0.3),
+        -10px -10px 30px rgba(255, 255, 255, 0.8),
+        inset 5px 5px 15px rgba(255, 255, 255, 0.8),
+        inset -5px -5px 15px rgba(163, 177, 198, 0.2);
+    animation: floatShape 15s infinite linear;
+    z-index: 1;
+}
+
+.shape1 {
+    width: 300px;
+    height: 300px;
+    top: -50px;
+    left: -50px;
+    background: rgba(255, 255, 255, 0.6);
+    /* white */
+}
+
+.shape2 {
+    width: 400px;
+    height: 200px;
+    border-radius: 100px;
+    bottom: 10%;
+    right: -100px;
+    background: rgba(255, 219, 77, 0.15);
+    /* light yellow */
+    animation-duration: 20s;
+    animation-direction: reverse;
+}
+
+.shape3 {
+    width: 200px;
+    height: 200px;
+    top: 40%;
+    left: 80%;
+    background: rgba(255, 255, 255, 0.8);
+    /* white */
+    animation-duration: 12s;
+}
+
+@keyframes floatShape {
+    0% {
+        transform: rotate(0deg) translate(0, 0) scale(1);
+    }
+
+    33% {
+        transform: rotate(120deg) translate(30px, -50px) scale(1.1);
+    }
+
+    66% {
+        transform: rotate(240deg) translate(-20px, 40px) scale(0.9);
+    }
+
+    100% {
+        transform: rotate(360deg) translate(0, 0) scale(1);
+    }
+}
+
+#physics-letters-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    z-index: 10;
+}
+
+.word-group {
+    display: flex;
+}
+
+.word-group .clay-letter:not(:first-child) {
+    margin-left: -15px; /* Overlap to connect the balls */
+}
+
+/* Bouncing Clay Letters */
+.clay-letter {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%; /* Circle for smooth collision visually */
+    background: #ffffff;
+    color: var(--accent-yellow-dark);
+    font-family: var(--font-heading);
+    font-weight: 900;
+    font-size: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    
+    transform: scale(0);
+    animation: pop-bounce 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    
+    /* Claymorphism shadow */
+    box-shadow:
+        8px 8px 16px rgba(163, 177, 198, 0.4),
+        -8px -8px 16px rgba(255, 255, 255, 0.9),
+        inset 3px 3px 6px rgba(255, 255, 255, 0.8),
+        inset -3px -3px 6px rgba(0, 0, 0, 0.05);
+}
+
+.word-group:nth-child(1) .clay-letter { animation-delay: 0s; }
+.word-group:nth-child(2) .clay-letter { animation-delay: 0.2s; }
+.word-group:nth-child(3) .clay-letter { animation-delay: 0.4s; }
+
+@keyframes pop-bounce {
+    0% { transform: scale(0); opacity: 0; }
+    60% { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
 }

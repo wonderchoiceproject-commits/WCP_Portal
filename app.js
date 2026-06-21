@@ -1,7 +1,7 @@
 // ==========================================
 // CONFIGURATION & STATE
 // ==========================================
-const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbxA1ageD7krYeGWaodYPZ2bsCDdM7wwqDnpmWC18FEGZt8Z4dcEJrk8u9oBWtcO-AyH/exec';
+const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbw_6tqY_o_-wzRNScu69KaM6pDaKQam_iNPmSyjVbXDtJc-dAiN9KdcYfGfeZO6jSoZ/exec';
 let currentView = 'home';
 let viewHistory = [];
 let isLoading = true;
@@ -241,6 +241,17 @@ async function sendAction(action, payload) {
 // VIEWS
 // ==========================================
 
+function getMemberNameFromSquad(squadNum) {
+    if (!squadNum) return '';
+    if (mockData && mockData.members) {
+        const member = mockData.members.find(m => String(m.squadNumber) === String(squadNum));
+        if (member && member.name) {
+            return `${member.name} (${squadNum})`;
+        }
+    }
+    return squadNum;
+}
+
 function renderHome() {
     let html = `
         <div class="view-animate">
@@ -347,32 +358,32 @@ function renderBooks() {
                 </div>
             </div>
 
-            <div class="grid-3">
-                ${booksToRender.length === 0 ? '<div class="cyber-card" style="text-align:center; padding:2rem; color:var(--text-muted); grid-column: 1 / -1;">該当する本が見つかりませんでした</div>' : booksToRender.map(book => `
-                    <div class="cyber-card" style="display: flex; flex-direction: column; justify-content: space-between;">
-                        <div>
-                            <div class="book-title" style="margin-top: 0;">${book.title}</div>
-                            <div class="book-meta" style="margin-bottom: 1rem;">${book.author}</div>
-                        </div>
+            <div class="book-shelf-grid">
+                ${booksToRender.length === 0 ? '<div style="text-align:center; padding:2rem; color:var(--text-muted); grid-column: 1 / -1;">該当する本が見つかりませんでした</div>' : booksToRender.map(book => {
+                    const spineColors = ['#fc8181', '#63b3ed', '#68d391', '#ffdb4d', '#b794f4', '#f6ad55', '#4fd1c5'];
+                    const spineColor = spineColors[book.title.length % spineColors.length];
+                    return `
+                    <div class="book-spine-card" style="border-left-color: ${spineColor};">
+                        <div class="book-spine-title">${book.title}</div>
+                        <div class="book-meta" style="text-align:center; font-size: 0.8rem; margin-bottom: 0.5rem; word-break: break-all;">${book.author}</div>
                         
-                        <div>
-                            <div style="margin-bottom: 1rem;">
+                        <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                            <div style="text-align:center; margin-bottom: 0.5rem;">
                                 ${book.status === 'available' 
-                                    ? `<span class="status-badge status-available">貸出可能</span>`
-                                    : `<span class="status-badge status-borrowed">貸出中: ${book.borrower} (期限: ${book.dueDate})</span>`
+                                    ? `<span class="status-badge status-available" style="font-size:0.7rem; padding:0.2rem 0.5rem; display:block;">貸出可</span>`
+                                    : `<span class="status-badge status-borrowed" style="font-size:0.7rem; padding:0.2rem 0.5rem; display:block;">貸出中<br>${getMemberNameFromSquad(book.borrower)}</span>`
                                 }
                             </div>
                             
-                            <div style="display: flex; gap: 0.5rem;">
-                                ${book.status === 'available'
-                                    ? `<button class="cyber-btn" style="flex: 1;" onclick="openBorrowModal('${book.id}')">借りる</button>`
-                                    : `<button class="cyber-btn danger" style="flex: 1;" onclick="returnBook('${book.id}')">返却</button>`
-                                }
-                                <button class="cyber-btn" title="履歴を見る" onclick="openReviewModal('${book.id}')"><i class="fa-solid fa-clock-rotate-left"></i></button>
-                            </div>
+                            ${book.status === 'available'
+                                ? `<button class="cyber-btn" style="padding: 0.4rem; font-size: 0.75rem;" onclick="openBorrowModal('${book.id}')">借りる</button>`
+                                : `<button class="cyber-btn danger" style="padding: 0.4rem; font-size: 0.75rem;" onclick="returnBook('${book.id}')">返却</button>`
+                            }
+                            <button class="cyber-btn" style="padding: 0.4rem; font-size: 0.75rem;" title="感想文履歴" onclick="openReviewModal('${book.id}')"><i class="fa-solid fa-clock-rotate-left"></i> 感想文</button>
+                            <button class="cyber-btn" style="padding: 0.4rem; font-size: 0.75rem; color: var(--accent-green);" title="感想文提出" onclick="openAddReviewModal('', '${book.id}')"><i class="fa-solid fa-pen-nib"></i> 提出</button>
                         </div>
                     </div>
-                `).join('')}
+                `}).join('')}
             </div>
         </div>
     `;
@@ -1541,7 +1552,19 @@ async function returnBook(bookId) {
 
 function openReviewModal(bookId) {
     const book = mockData.books.find(b => b.id === bookId);
-    const bookReviews = mockData.reviews.filter(r => r.bookId === bookId);
+    if (!book) return;
+    
+    const baseIdParts = book.id.split('-');
+    const baseId = baseIdParts.length >= 2 ? baseIdParts[0] + '-' + baseIdParts[1] : book.id;
+    
+    // IDの共通部分（A-1など）から同一本を判定して感想文をすべて抽出
+    const bookReviews = mockData.reviews.filter(r => {
+        const rBook = mockData.books.find(b => b.id === r.bookId);
+        if (!rBook) return false;
+        const rBaseParts = rBook.id.split('-');
+        const rBaseId = rBaseParts.length >= 2 ? rBaseParts[0] + '-' + rBaseParts[1] : rBook.id;
+        return rBaseId === baseId || rBook.title === book.title;
+    });
     
     let html = `
         <h2 style="margin-bottom: 1rem; color: var(--accent-green);"><i class="fa-solid fa-clock-rotate-left"></i> 感想文履歴</h2>
@@ -1550,10 +1573,10 @@ function openReviewModal(bookId) {
         <div class="timeline">
             ${bookReviews.length > 0 ? bookReviews.map(review => `
                 <div class="timeline-item">
-                    <div style="font-family: var(--font-heading); font-size: 0.8rem; color: var(--accent-green);">${review.date} - 背番号 ${review.reviewer}</div>
-                    <div style="margin-top: 0.5rem; font-size: 1rem; line-height: 1.6; letter-spacing: 0.03em; white-space: pre-wrap; color: var(--text-main);">「${review.text}」</div>
+                    <div style="font-family: var(--font-heading); font-size: 0.8rem; color: var(--accent-green); margin-bottom: 0.5rem;">${review.date} - 背番号 ${review.reviewer}</div>
+                    <button class="cyber-btn" style="padding: 0.5rem 1rem;" onclick="openDocViewerModal('${review.docLink}', '${book.title} (背番号${review.reviewer})')"><i class="fa-solid fa-file-lines"></i> 感想文を読む</button>
                 </div>
-            `).join('') : '<div style="color: var(--text-muted);">この本の履歴はまだありません。</div>'}
+            `).join('') : '<div style="color: var(--text-muted);">この本の感想文はまだありません。</div>'}
         </div>
     `;
     openModal(html);
@@ -1946,7 +1969,7 @@ async function submitMemberEdit(squadNum, fieldName) {
 // ==========================================
 // ADD REVIEW MODAL & ACTIONS
 // ==========================================
-function openAddReviewModal(squadNum) {
+function openAddReviewModal(squadNum = '', defaultBookId = '') {
     const seenBooks = new Set();
     let bookOptions = '';
     for (const b of mockData.books) {
@@ -1958,7 +1981,8 @@ function openAddReviewModal(squadNum) {
         }
         if (!seenBooks.has(identifier)) {
             seenBooks.add(identifier);
-            bookOptions += `<option value="${b.id}">${b.title}</option>`;
+            const isSelected = b.id === defaultBookId ? 'selected' : '';
+            bookOptions += `<option value="${b.id}" ${isSelected}>${b.title}</option>`;
         }
     }
     
@@ -1967,7 +1991,7 @@ function openAddReviewModal(squadNum) {
         
         <div class="form-group">
             <label>背番号 (Squad Number)</label>
-            <input type="text" id="addReviewSquadNum" class="cyber-input" value="${squadNum}" readonly>
+            <input type="text" id="addReviewSquadNum" class="cyber-input" value="${squadNum}" ${squadNum ? 'readonly' : ''} placeholder="例: 001">
         </div>
         
         <div class="form-group">
@@ -2384,11 +2408,37 @@ document.addEventListener('DOMContentLoaded', () => {
         const viewParam = params.get('view');
         currentView = viewParam ? viewParam : 'home';
         
+        const targetSquad = params.get('squadNum');
+        if (targetSquad) {
+            currentRosterSearch = targetSquad; // set filter
+        }
+        
+        const targetEventId = params.get('eventId');
+        if (targetEventId) {
+            currentScheduleView = 'event';
+        }
+        
         // URLパラメータをクリーンにする(任意)
-        if (viewParam) {
+        if (viewParam || targetSquad || targetEventId) {
             window.history.replaceState({}, document.title, window.location.pathname);
         }
         
-        fetchPortalData();
+        fetchPortalData().then(() => {
+            // Scroll to event if schedule is targeted
+            if (targetEventId && currentView === 'schedule') {
+                setTimeout(() => {
+                    const eventCards = document.querySelectorAll('.cyber-card');
+                    for (const card of eventCards) {
+                        if (card.innerHTML.includes(targetEventId)) {
+                            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            card.style.transition = 'box-shadow 0.3s';
+                            card.style.boxShadow = '0 0 20px var(--accent-pink)';
+                            setTimeout(() => card.style.boxShadow = '', 3000);
+                            break;
+                        }
+                    }
+                }, 500);
+            }
+        });
     }
 });

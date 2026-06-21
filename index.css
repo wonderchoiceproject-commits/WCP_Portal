@@ -421,6 +421,66 @@ h6,
     margin-bottom: 1rem;
 }
 
+/* Book Spine Design */
+.book-shelf-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 2rem;
+    padding: 2rem 1.5rem;
+    
+    /* 白っぽい木目調 (White Wood Grain) */
+    background-color: #fdfdfd;
+    background-image: 
+        repeating-linear-gradient(
+            to right,
+            transparent,
+            transparent 10px,
+            rgba(0, 0, 0, 0.02) 10px,
+            rgba(0, 0, 0, 0.02) 20px
+        ),
+        linear-gradient(to right, #f4f4f4, #ffffff, #f4f4f4);
+    
+    border-radius: 15px;
+    box-shadow: inset 0 10px 20px rgba(0,0,0,0.08);
+    border-bottom: 15px solid #e0e5eb;
+}
+
+.book-spine-card {
+    background: linear-gradient(90deg, #f7fafc 0%, #ffffff 15%, #edf2f7 100%);
+    border-left: 15px solid var(--accent-blue);
+    border-radius: 4px 12px 12px 4px;
+    padding: 1rem 0.8rem;
+    box-shadow: 4px 4px 10px rgba(0,0,0,0.1), inset 2px 0 5px rgba(255,255,255,0.7);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 380px;
+    position: relative;
+    transition: all var(--transition-speed) ease;
+}
+
+.book-spine-card:hover {
+    transform: translateY(-10px) scale(1.03);
+    box-shadow: 8px 15px 20px rgba(0,0,0,0.15);
+    z-index: 10;
+}
+
+.book-spine-title {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    font-family: var(--font-heading);
+    font-size: 1.4rem;
+    font-weight: 900;
+    letter-spacing: 0.15em;
+    color: var(--text-main);
+    margin: 1rem auto;
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+    text-shadow: 1px 1px 0px rgba(255,255,255,0.8);
+    max-height: 220px;
+}
+
 /* Roster Profile */
 .profile-header {
     display: flex;

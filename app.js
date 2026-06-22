@@ -427,9 +427,9 @@ function getOrganizationEditHtml() {
     const orgHtml = getOrganizationHtml();
 
     return `
-        <div style="display: flex; gap: 1rem; height: calc(100vh - 250px); min-height: 500px;">
+        <div class="org-edit-container" style="display: flex; gap: 1rem; height: calc(100vh - 250px); min-height: 500px;">
             <!-- Left Pane: Draggable Members -->
-            <div style="width: 250px; background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div class="org-edit-left-pane" style="width: 250px; background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                 <div style="padding: 1rem; background: var(--surface-color); border-bottom: 1px solid var(--border-color);">
                     <div style="font-size: 0.85rem; color: var(--accent-blue); margin-bottom: 0.5rem; font-weight: bold;"><i class="fa-solid fa-users"></i> アサイン用メンバー</div>
                     <div style="display: flex; gap: 0.5rem;">
@@ -445,7 +445,7 @@ function getOrganizationEditHtml() {
             </div>
 
             <!-- Right Pane: Organization Tree -->
-            <div style="flex: 1; border: 1px dashed var(--accent-pink); border-radius: 8px; background: rgba(0,0,0,0.02); overflow: auto; position: relative;">
+            <div class="org-edit-right-pane" style="flex: 1; border: 1px dashed var(--accent-pink); border-radius: 8px; background: rgba(0,0,0,0.02); overflow: auto; position: relative;">
                 <div style="position: absolute; top: 1rem; right: 1rem; background: var(--accent-pink); color: #fff; padding: 0.3rem 0.8rem; border-radius: 12px; font-size: 0.8rem; font-weight: bold; pointer-events: none; z-index: 10;"><i class="fa-solid fa-arrows-up-down-left-right"></i> D&Dでアサイン可能</div>
                 ${orgHtml}
             </div>

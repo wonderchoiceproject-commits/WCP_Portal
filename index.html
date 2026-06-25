@@ -198,6 +198,32 @@
         </div>
     </div>
 
+    <!-- Typing Record Submission Modal -->
+    <div id="typing-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeTypingModal()"><i class="fa-solid fa-xmark"></i></button>
+            <h2 style="margin-bottom: 1rem; color: var(--accent-green);"><i class="fa-solid fa-keyboard"></i> タイピング記録提出</h2>
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label style="display: block; margin-bottom: 0.5rem; color: var(--accent-blue);">コース選択</label>
+                <select id="typingCourse" class="cyber-input" style="width: 100%; padding: 0.5rem; background: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 4px;">
+                    <option value="3000">3000円コース</option>
+                    <option value="5000">5000円コース</option>
+                    <option value="10000">10000円コース</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label style="display: block; margin-bottom: 0.5rem; color: var(--accent-blue);">記録 (スコア)</label>
+                <input type="number" id="typingScore" class="cyber-input" placeholder="例: 250" style="width: 100%; padding: 0.5rem; background: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 4px;">
+            </div>
+            <div class="form-group" style="margin-bottom: 1.5rem;">
+                <label style="display: block; margin-bottom: 0.5rem; color: var(--accent-blue);">スクショ画像</label>
+                <input type="file" id="typingImage" class="cyber-input" accept="image/*" style="width: 100%; padding: 0.5rem; background: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 4px;">
+            </div>
+            <input type="hidden" id="typingSquadNum">
+            <button class="cyber-btn" id="btn-submit-typing" style="width: 100%; margin-top: 1rem; padding: 0.8rem;" onclick="submitTyping()"><i class="fa-solid fa-paper-plane"></i> 送信</button>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>

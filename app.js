@@ -1,7 +1,7 @@
 // ==========================================
 // CONFIGURATION & STATE
 // ==========================================
-const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbz8xEB1cSpuWBRDdnOHY2ffh8Rzk_TSMMou-WgOcmgA3dmolc1J1QSo3NYGEAk6cX8/exec';
+const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbz19IL7I5bfwdxsU7I-dnvoxXtv5lp3xYDcdZK_vNjZAKruZYxGwUWyOmT5-CqV4Io/exec';
 let currentView = 'home';
 let viewHistory = [];
 let isLoading = true;
@@ -13,7 +13,8 @@ let mockData = {
     reviews: [],
     members: [],
     events: [],
-    departments: []
+    departments: [],
+    settings: {}
 };
 
 let currentRosterTab = 'members';
@@ -894,6 +895,22 @@ function renderRoster() {
     mockData.members = mockData.members || [];
     mockData.departments = mockData.departments || [];
     mockData.reviews = mockData.reviews || [];
+    mockData.settings = mockData.settings || {};
+
+    const now = new Date();
+    let isTypingPeriod = false;
+    // 古いGASデプロイによって1行目(StartDate)がスキップされているケースを考慮し、どちらかがあれば判定を行う
+    if (mockData.settings.typingStartDate || mockData.settings.typingEndDate) {
+        const start = mockData.settings.typingStartDate ? new Date(mockData.settings.typingStartDate) : new Date(0); // なければ過去として扱う
+        const end = mockData.settings.typingEndDate ? new Date(mockData.settings.typingEndDate) : new Date(2100, 0, 1); // なければ未来として扱う
+        
+        // 終了日はその日の23:59:59までを含める（当日の朝などに消えないように）
+        end.setHours(23, 59, 59, 999);
+
+        if (now >= start && now <= end) {
+            isTypingPeriod = true;
+        }
+    }
 
     let tabsHtml = `
         <div class="schedule-tabs" style="margin-bottom: 2rem;">
@@ -1065,6 +1082,7 @@ function renderRoster() {
                                 <div>
                                     <h4 style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.3rem;">タイピング記録</h4>
                                     <div style="font-weight: bold;">${member.typingScore || '未登録'}</div>
+                                    ${isTypingPeriod ? `<button class="cyber-btn" style="padding: 0.4rem; font-size: 0.75rem; margin-top: 0.5rem; background: var(--accent-green); color: #fff; border: none;" onclick="event.stopPropagation(); openTypingModal('${member.squadNumber}')"><i class="fa-solid fa-upload"></i> 今月のタイピング記録を提出</button>` : ''}
                                 </div>
                                 <button class="cyber-btn member-edit-btn" onclick="event.stopPropagation(); openEditMemberModal('${member.squadNumber}', 'typingScore', '${member.typingScore || ''}')"><i class="fa-solid fa-pen"></i> 編集</button>
                             </div>
@@ -1477,6 +1495,88 @@ function renderSchedule() {
 const modalOverlay = document.getElementById('modal-overlay');
 const modalBody = document.getElementById('modal-body');
 const modalClose = document.getElementById('modal-close');
+
+window.openTypingModal = function(squadNum) {
+    const typingSquadNumEl = document.getElementById('typingSquadNum');
+    if(typingSquadNumEl) typingSquadNumEl.value = squadNum;
+    document.getElementById('typingCourse').value = '3000';
+    document.getElementById('typingScore').value = '';
+    document.getElementById('typingImage').value = '';
+    document.getElementById('typing-modal').classList.remove('hidden');
+}
+
+window.closeTypingModal = function() {
+    document.getElementById('typing-modal').classList.add('hidden');
+}
+
+window.submitTyping = async function() {
+    const squadNum = document.getElementById('typingSquadNum').value;
+    const course = document.getElementById('typingCourse').value;
+    const score = document.getElementById('typingScore').value;
+    const fileInput = document.getElementById('typingImage');
+    
+    if(!squadNum || !course || !score || !fileInput.files.length) {
+        alert("すべての項目（コース、記録、画像）を入力してください。");
+        return;
+    }
+    
+    const file = fileInput.files[0];
+    
+    const submitBtn = document.getElementById('btn-submit-typing');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 送信中...';
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = new Image();
+        img.onload = async function() {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            
+            const MAX_WIDTH = 1200;
+            const MAX_HEIGHT = 1200;
+            
+            if (width > height) {
+                if (width > MAX_WIDTH) {
+                    height *= MAX_WIDTH / width;
+                    width = MAX_WIDTH;
+                }
+            } else {
+                if (height > MAX_HEIGHT) {
+                    width *= MAX_HEIGHT / height;
+                    height = MAX_HEIGHT;
+                }
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            
+            const payload = {
+                squadNum: squadNum,
+                course: parseInt(course, 10),
+                score: parseInt(score, 10),
+                imageBase64: dataUrl,
+                imageMimeType: 'image/jpeg',
+                filename: 'typing_record.jpg'
+            };
+            
+            const success = await sendAction('submitTyping', payload);
+            if (success) {
+                alert("タイピング記録を提出しました！");
+                closeTypingModal();
+            }
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> 送信';
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
 
 modalClose.addEventListener('click', closeModal);
 

@@ -29,6 +29,7 @@ let currentRosterFilterCategory = '';
 
 // Book Filters
 let currentBookSearch = '';
+let currentBookFilterBorrowed = false;
 let pendingOrgUpdates = [];
 
 // ==========================================
@@ -343,19 +344,29 @@ function renderBooks() {
         });
     }
 
+    if (currentBookFilterBorrowed) {
+        booksToRender = booksToRender.filter(b => b.status !== 'available');
+    }
+
     let html = `
         <div class="view-animate">
             ${getBackButtonHtml()}
             <h1 class="section-title">図書管理</h1>
             
+            <button class="cyber-btn" style="margin-bottom: 1.5rem; width: 100%; font-size: 1.1rem; padding: 1rem;" onclick="openAddReviewModal('', 'other')"><i class="fa-solid fa-pen-nib"></i> 「読書感想文」提出（図書以外の本）</button>
             <div class="cyber-card" style="margin-bottom: 1.5rem; padding: 1rem;">
                 <div style="font-size: 0.8rem; color: var(--accent-blue); margin-bottom: 0.3rem;"><i class="fa-solid fa-magnifying-glass"></i> 本の検索 (タイトル・著者)</div>
-                <div style="display: flex; gap: 0.5rem;">
-                    <input type="text" id="bookSearchInput" placeholder="本のタイトルや著者を入力..." value="${currentBookSearch}" 
-                           onkeydown="if(event.key === 'Enter') handleBookSearch(this.value)"
-                           style="flex: 1; width: 100%; background: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.5rem; border-radius: 4px; outline: none; transition: border-color 0.3s;"
-                           onfocus="this.style.borderColor='var(--accent-blue)'" onblur="this.style.borderColor='var(--border-color)'">
-                    <button class="cyber-btn" onclick="handleBookSearch(document.getElementById('bookSearchInput').value)" style="padding: 0.5rem 1rem;">検索</button>
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="text" id="bookSearchInput" placeholder="本のタイトルや著者を入力..." value="${currentBookSearch}" 
+                               onkeydown="if(event.key === 'Enter') handleBookSearch(this.value)"
+                               style="flex: 1; width: 100%; background: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.5rem; border-radius: 4px; outline: none; transition: border-color 0.3s;"
+                               onfocus="this.style.borderColor='var(--accent-blue)'" onblur="this.style.borderColor='var(--border-color)'">
+                        <button class="cyber-btn" onclick="handleBookSearch(document.getElementById('bookSearchInput').value)" style="padding: 0.5rem 1rem;">検索</button>
+                    </div>
+                    <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.9rem; margin-top:0.5rem; color:var(--text-main); cursor:pointer;">
+                        <input type="checkbox" ${currentBookFilterBorrowed ? 'checked' : ''} onchange="handleBookFilterBorrowed(this.checked)" style="cursor:pointer; transform:scale(1.2);"> 貸出中の本のみ表示
+                    </label>
                 </div>
             </div>
 
@@ -372,7 +383,7 @@ function renderBooks() {
                             <div style="text-align:center; margin-bottom: 0.5rem;">
                                 ${book.status === 'available' 
                                     ? `<span class="status-badge status-available" style="font-size:0.7rem; padding:0.2rem 0.5rem; display:block;">貸出可</span>`
-                                    : `<span class="status-badge status-borrowed" style="font-size:0.7rem; padding:0.2rem 0.5rem; display:block;">貸出中<br>${getMemberNameFromSquad(book.borrower)}</span>`
+                                    : `<span class="status-badge status-borrowed" style="font-size:0.7rem; padding:0.2rem 0.5rem; display:block;">貸出中<br>${getMemberNameFromSquad(book.borrower)}${book.dueDate ? `<br>期限: ${book.dueDate}` : ''}</span>`
                                 }
                             </div>
                             
@@ -890,6 +901,7 @@ window.handleRosterFilterProject = function(val) { currentRosterFilterProject = 
 window.handleRosterFilterGeneration = function(val) { currentRosterFilterGeneration = val; renderRoster(); };
 window.handleRosterFilterCategory = function(val) { currentRosterFilterCategory = val; renderRoster(); };
 window.handleBookSearch = function(val) { currentBookSearch = val; renderBooks(); };
+window.handleBookFilterBorrowed = function(val) { currentBookFilterBorrowed = val; renderBooks(); };
 
 function renderRoster() {
     mockData.members = mockData.members || [];
@@ -1035,7 +1047,22 @@ function renderRoster() {
                         <div class="profile-header" style="margin-bottom: 0;">
                             <div class="avatar">${member.squadNumber}</div>
                             <div class="profile-info" style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
-                                <h3 style="color: var(--accent-green); margin-bottom: 0.4rem; font-size: 1.4rem;">${member.name}</h3>
+                                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; flex-wrap: wrap;">
+                                    <h3 style="color: var(--accent-green); font-size: 1.4rem; margin: 0;">${member.name}</h3>
+                                    ${member.badges && member.badges.length > 0 ? member.badges.map(badge => {
+                                        const isTarget = isEditMode;
+                                        const delBtn = isTarget ? ` <i class="fa-solid fa-xmark" style="cursor:pointer; margin-left:0.3rem;" onclick="event.stopPropagation(); deleteBadge('${member.squadNumber}', '${badge}')"></i>` : '';
+                                        let bName = badge;
+                                        let bColor = 'var(--accent-blue)';
+                                        const match = badge.match(/(.*)\((#[0-9a-fA-F]{3,6}|[a-zA-Z]+)\)$/);
+                                        if (match) {
+                                            bName = match[1].trim();
+                                            bColor = match[2];
+                                        }
+                                        return `<span class="badge" style="color: ${bColor}; font-size: 0.7rem; padding: 0.2rem 0.5rem; background: var(--surface-color); border: 1px solid var(--border-color);">${bName}${delBtn}</span>`;
+                                    }).join('') : ''}
+                                    ${isEditMode ? `<button class="cyber-btn" style="padding: 0.2rem 0.5rem; font-size: 0.7rem; border-radius: 10px;" onclick="event.stopPropagation(); openAddBadgeModal('${member.squadNumber}')"><i class="fa-solid fa-plus"></i> バッジ追加</button>` : ''}
+                                </div>
                                 <div style="font-family: var(--font-heading); font-size: 0.95rem; color: var(--text-muted); display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap;">
                                     <span>背番号: <span style="color: var(--text-main); font-weight: bold;">${member.squadNumber}</span></span>
                                     <span>カテゴリー: <span style="color: var(--text-main); font-weight: bold;">${member.category || '未登録'}</span></span>
@@ -1054,7 +1081,7 @@ function renderRoster() {
                                 ${(() => {
                                     const nextCatInfo = getNextCategoryInfo(member.category);
                                     if (!nextCatInfo) {
-                                        return `<div style="text-align: center; margin: 1rem 0; width: 100%; font-weight: bold; color: var(--accent-blue); text-shadow: 1px 1px 0px var(--border-color); letter-spacing: 2px;"><i class="fa-solid fa-crown" style="color: gold;"></i> ★すべてのカテゴリー条件を達成しました！</div>`;
+                                        return `<div style="text-align: center; margin: 1rem 0; width: 100%; font-weight: bold; color: var(--accent-blue); text-shadow: 1px 1px 0px var(--border-color); letter-spacing: 2px;"><i class="fa-solid fa-crown" style="color: gold;"></i> Core</div>`;
                                     }
                                     const reqs = nextCatInfo.requirements;
                                     const isTarget = isEditMode;
@@ -1078,34 +1105,18 @@ function renderRoster() {
                                 })()}
                             </div>
                             
-                            <div class="detail-row">
-                                <div>
-                                    <h4 style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.3rem;">タイピング記録</h4>
-                                    <div style="font-weight: bold;">${member.typingScore || '未登録'}</div>
-                                    ${isTypingPeriod ? `<button class="cyber-btn" style="padding: 0.4rem; font-size: 0.75rem; margin-top: 0.5rem; background: var(--accent-green); color: #fff; border: none;" onclick="event.stopPropagation(); openTypingModal('${member.squadNumber}')"><i class="fa-solid fa-upload"></i> 今月のタイピング記録を提出</button>` : ''}
-                                </div>
-                                <button class="cyber-btn member-edit-btn" onclick="event.stopPropagation(); openEditMemberModal('${member.squadNumber}', 'typingScore', '${member.typingScore || ''}')"><i class="fa-solid fa-pen"></i> 編集</button>
-                            </div>
-                            
-                            <div class="detail-row">
+                            <div class="detail-row" style="display: flex; gap: 1rem;">
                                 <div style="flex: 1;">
-                                    <h4 style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.3rem;">バッジ</h4>
-                                    <div class="badge-list" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                        ${member.badges && member.badges.length > 0 ? member.badges.map(badge => {
-                                            const isTarget = isEditMode;
-                                            const delBtn = isTarget ? ` <i class="fa-solid fa-xmark" style="cursor:pointer; margin-left:0.3rem;" onclick="event.stopPropagation(); deleteBadge('${member.squadNumber}', '${badge}')"></i>` : '';
-                                            // Handle colors if badge format is Name(Color)
-                                            let bName = badge;
-                                            let bColor = 'var(--accent-blue)';
-                                            const match = badge.match(/(.*)\((#[0-9a-fA-F]{3,6}|[a-zA-Z]+)\)$/);
-                                            if (match) {
-                                                bName = match[1].trim();
-                                                bColor = match[2];
-                                            }
-                                            return `<span class="badge" style="color: ${bColor};">${bName}${delBtn}</span>`;
-                                        }).join('') : '<span style="color: var(--text-muted); font-size: 0.8rem;">なし</span>'}
-                                        ${isEditMode ? `<button class="cyber-btn" style="padding: 0.2rem 0.5rem; font-size: 0.7rem; border-radius: 10px;" onclick="event.stopPropagation(); openAddBadgeModal('${member.squadNumber}')"><i class="fa-solid fa-plus"></i> バッジ追加</button>` : ''}
-                                    </div>
+                                    <h4 style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.3rem;">タイピング記録</h4>
+                                    <div style="font-weight: bold; margin-bottom: 0.5rem;">${member.typingScore || '未登録'}</div>
+                                    <button class="cyber-btn member-edit-btn" onclick="event.stopPropagation(); openEditMemberModal('${member.squadNumber}', 'typingScore', '${member.typingScore || ''}')"><i class="fa-solid fa-pen"></i> 編集</button>
+                                </div>
+                                <div style="flex: 1; border-left: 1px dashed var(--border-color); padding-left: 1rem;">
+                                    <h4 style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.3rem;">毎月提出</h4>
+                                    <div style="font-weight: bold; margin-bottom: 0.5rem; font-size: 0.9rem;">${member.monthlyTyping || '未提出'}</div>
+                                    ${isTypingPeriod 
+                                        ? `<button class="cyber-btn" style="padding: 0.4rem; font-size: 0.75rem; background: var(--accent-green); color: #fff; border: none;" onclick="event.stopPropagation(); openTypingModal('${member.squadNumber}')"><i class="fa-solid fa-upload"></i> 今月のタイピング記録を提出</button>` 
+                                        : `<div style="font-size: 0.8rem; color: var(--accent-pink); border: 1px solid var(--accent-pink); padding: 0.3rem; border-radius: 4px; text-align: center; max-width: max-content;">期間外</div>`}
                                 </div>
                             </div>
 
@@ -2072,6 +2083,8 @@ async function submitMemberEdit(squadNum, fieldName) {
 function openAddReviewModal(squadNum = '', defaultBookId = '') {
     const seenBooks = new Set();
     let bookOptions = '';
+    let bookTitleText = '';
+    
     for (const b of mockData.books) {
         if (!b.id) continue;
         const parts = b.id.split('-');
@@ -2081,9 +2094,41 @@ function openAddReviewModal(squadNum = '', defaultBookId = '') {
         }
         if (!seenBooks.has(identifier)) {
             seenBooks.add(identifier);
+            if (b.id === defaultBookId) bookTitleText = b.title;
             const isSelected = b.id === defaultBookId ? 'selected' : '';
             bookOptions += `<option value="${b.id}" ${isSelected}>${b.title}</option>`;
         }
+    }
+    
+    let bookSelectionGroup = '';
+    if (defaultBookId) {
+        bookSelectionGroup = `
+            <div class="form-group">
+                <label>本のタイトル</label>
+                <div class="cyber-input" style="background: rgba(0,0,0,0.2); color: var(--text-muted); cursor: not-allowed; pointer-events: none;">${bookTitleText}</div>
+                <select id="addReviewBookSelect" style="display: none;">
+                    <option value="${defaultBookId}" selected>${bookTitleText}</option>
+                </select>
+            </div>
+            <div style="display: none;">
+                <input type="text" id="addReviewManualTitle" value="">
+            </div>
+        `;
+    } else {
+        bookSelectionGroup = `
+            <div class="form-group">
+                <label>本のタイトル (図書管理の本から選択)</label>
+                <select id="addReviewBookSelect" class="cyber-input" onchange="if(this.value) document.getElementById('addReviewManualTitle').value = '';">
+                    <option value="">選択してください</option>
+                    ${bookOptions}
+                </select>
+            </div>
+            
+            <div class="form-group" id="manualBookTitleGroup">
+                <label>図書以外の本の感想文</label>
+                <input type="text" id="addReviewManualTitle" class="cyber-input" placeholder="図書以外の本のタイトルを入力" oninput="if(this.value.trim()) document.getElementById('addReviewBookSelect').value = '';">
+            </div>
+        `;
     }
     
     let html = `
@@ -2094,19 +2139,7 @@ function openAddReviewModal(squadNum = '', defaultBookId = '') {
             <input type="text" id="addReviewSquadNum" class="cyber-input" value="${squadNum}" ${squadNum ? 'readonly' : ''} placeholder="例: 001">
         </div>
         
-        <div class="form-group">
-            <label>本のタイトル</label>
-            <select id="addReviewBookSelect" class="cyber-input" onchange="toggleManualBookTitle()">
-                <option value="">選択してください</option>
-                ${bookOptions}
-                <option value="other">その他（手動入力）</option>
-            </select>
-        </div>
-        
-        <div class="form-group" id="manualBookTitleGroup" style="display: none;">
-            <label>本のタイトル (手動入力)</label>
-            <input type="text" id="addReviewManualTitle" class="cyber-input" placeholder="本のタイトルを入力">
-        </div>
+        ${bookSelectionGroup}
         
         <div class="form-group">
             <label>感想文リンク (ドキュメントURL)</label>
@@ -2134,21 +2167,28 @@ async function submitAddReview() {
     const manualTitle = document.getElementById('addReviewManualTitle').value;
     const docLink = document.getElementById('addReviewDocLink').value;
     
+    if (!squadNum.trim()) {
+        alert("背番号を入力してください。");
+        return;
+    }
+    
     let bookId = '';
     let bookTitle = '';
     
-    if (select.value === '') {
-        alert("本のタイトルを選択してください。");
+    if (manualTitle.trim() && select.value !== '') {
+        alert("図書の本の選択と、図書以外の本の入力は、どちらか一方のみにしてください。");
         return;
-    } else if (select.value === 'other') {
-        if (!manualTitle.trim()) {
-            alert("本のタイトルを手動入力してください。");
-            return;
-        }
+    }
+    
+    if (manualTitle.trim()) {
         bookTitle = manualTitle.trim();
-    } else {
+        bookId = 'other';
+    } else if (select.value !== '') {
         bookId = select.value;
         bookTitle = select.options[select.selectedIndex].text;
+    } else {
+        alert("本のタイトルを選択または入力してください。");
+        return;
     }
     
     if (!docLink.trim()) {
@@ -2156,11 +2196,12 @@ async function submitAddReview() {
         return;
     }
 
-    document.getElementById('btn-add-review').disabled = true;
-    document.getElementById('btn-add-review').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 送信中...';
+    const btn = document.getElementById('btn-add-review');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 送信中...';
     
     const success = await sendAction('addReview', { 
-        squadNumber: squadNum, 
+        squadNumber: squadNum.trim(), 
         bookId: bookId, 
         bookTitle: bookTitle, 
         docLink: docLink.trim() 
@@ -2174,8 +2215,8 @@ async function submitAddReview() {
         
         mockData.reviews.push({
             id: 'rev_' + Date.now(),
-            squadNumber: squadNum,
-            reviewer: squadNum,
+            squadNumber: squadNum.trim(),
+            reviewer: squadNum.trim(),
             bookId: bookId,
             bookTitle: bookTitle,
             docLink: docLink.trim(),
@@ -2184,6 +2225,9 @@ async function submitAddReview() {
         });
         navigateTo(currentView);
         closeModal();
+    } else {
+        btn.disabled = false;
+        btn.innerHTML = '追加する';
     }
 }
 

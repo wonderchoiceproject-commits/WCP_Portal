@@ -1,7 +1,7 @@
 // ==========================================
 // CONFIGURATION & STATE
 // ==========================================
-const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbyRJ1B2wrwzY3C9mbC7e4-HGSDGMu1yPJD5jAkTAmUuWoKSIdfSny00eTVuuZZ1lCM/exec';
+const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbyk3x66s_1_z0T82h3ZW9coEuyds_u0rEWMk1FMZfxiwuL6N0S6mW81TRcubD7WSzc/exec';
 let currentView = 'home';
 let viewHistory = [];
 let isLoading = true;

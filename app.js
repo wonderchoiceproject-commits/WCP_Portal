@@ -1,7 +1,7 @@
 // ==========================================
 // CONFIGURATION & STATE
 // ==========================================
-const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwPehktn0ZnsPT5HCEe-QSDeB4jgT3Ap7FM_K6gYKg2o2G4xGcrQTzwcENcHBhVTls/exec';
+const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbyRJ1B2wrwzY3C9mbC7e4-HGSDGMu1yPJD5jAkTAmUuWoKSIdfSny00eTVuuZZ1lCM/exec';
 let currentView = 'home';
 let viewHistory = [];
 let isLoading = true;
@@ -382,14 +382,27 @@ function renderBooks() {
                         <div style="display: flex; flex-direction: column; gap: 0.4rem;">
                             <div style="text-align:center; margin-bottom: 0.5rem;">
                                 ${book.status === 'available' 
-                                    ? `<span class="status-badge status-available" style="font-size:0.7rem; padding:0.2rem 0.5rem; display:block;">貸出可</span>`
+                                    ? (book.preserve && String(book.preserve).split(',').filter(Boolean).length > 0 
+                                        ? `<span class="status-badge" style="font-size:0.7rem; padding:0.2rem 0.5rem; display:block; background:var(--accent-yellow); color:#333;">予約取置中</span>`
+                                        : `<span class="status-badge status-available" style="font-size:0.7rem; padding:0.2rem 0.5rem; display:block;">貸出可</span>`)
                                     : `<span class="status-badge status-borrowed" style="font-size:0.7rem; padding:0.2rem 0.5rem; display:block;">貸出中<br>${getMemberNameFromSquad(book.borrower)}${book.dueDate ? `<br>期限: ${book.dueDate}` : ''}</span>`
                                 }
                             </div>
                             
+                            ${(() => {
+                                let preserveHtml = '';
+                                if (book.preserve) {
+                                    const preserveList = String(book.preserve).split(',').map(s => s.trim()).filter(Boolean);
+                                    if (preserveList.length > 0) {
+                                        preserveHtml = `<div style="font-size:0.7rem; color:var(--text-muted); text-align:center; margin-bottom:0.5rem; max-height:40px; overflow-y:auto; padding:2px; background:var(--surface-color); border-radius:4px;">予約者: ${preserveList.map(s => getMemberNameFromSquad(s)).join(', ')}</div>`;
+                                    }
+                                }
+                                return preserveHtml;
+                            })()}
+                            
                             ${book.status === 'available'
                                 ? `<button class="cyber-btn" style="padding: 0.4rem; font-size: 0.75rem;" onclick="openBorrowModal('${book.id}')">借りる</button>`
-                                : `<button class="cyber-btn danger" style="padding: 0.4rem; font-size: 0.75rem;" onclick="returnBook('${book.id}')">返却</button>`
+                                : `<div style="display:flex; gap:0.2rem;"><button class="cyber-btn danger" style="padding: 0.4rem; font-size: 0.75rem; flex:1;" onclick="returnBook('${book.id}')">返却</button><button class="cyber-btn" style="padding: 0.4rem; font-size: 0.75rem; flex:1; background:var(--accent-yellow); color:#333; border-color:var(--accent-yellow);" onclick="openReserveModal('${book.id}')">予約</button></div>`
                             }
                             <button class="cyber-btn" style="padding: 0.4rem; font-size: 0.75rem;" title="感想文履歴" onclick="openReviewModal('${book.id}')"><i class="fa-solid fa-clock-rotate-left"></i> 感想文</button>
                             <button class="cyber-btn" style="padding: 0.4rem; font-size: 0.75rem; color: var(--accent-green);" title="感想文提出" onclick="openAddReviewModal('', '${book.id}')"><i class="fa-solid fa-pen-nib"></i> 提出</button>
@@ -1639,15 +1652,24 @@ async function submitBorrow(bookId) {
             book.status = 'borrowed';
             book.borrower = squadNum;
             book.dueDate = dueDate;
+            if (book.preserve) {
+                let currentPreserve = String(book.preserve).split(',').map(s => s.trim()).filter(Boolean);
+                if (currentPreserve.length > 0 && String(currentPreserve[0]) === String(squadNum)) {
+                    currentPreserve.shift();
+                    book.preserve = currentPreserve.join(',');
+                }
+            }
         }
         navigateTo(currentView);
         closeModal();
+    } else {
+        document.getElementById('btn-borrow').disabled = false;
+        document.getElementById('btn-borrow').innerHTML = '貸出リクエスト送信';
     }
 }
 
 async function returnBook(bookId) {
     if(confirm("この本を返却しますか？")) {
-        // ボタンを無効化する代わりに少し待つUIも可能ですが、シンプルに同期
         const success = await sendAction('returnBook', { bookId });
         if (success) {
             const book = mockData.books.find(b => b.id === bookId);
@@ -1658,6 +1680,47 @@ async function returnBook(bookId) {
             }
             navigateTo(currentView);
         }
+    }
+}
+
+function openReserveModal(bookId) {
+    const book = mockData.books.find(b => b.id === bookId);
+    let html = `
+        <h2 style="margin-bottom: 1rem; color: var(--accent-yellow);"><i class="fa-solid fa-bookmark"></i> 本を予約する</h2>
+        <p style="margin-bottom: 1.5rem;">対象: <strong>${book.title}</strong></p>
+        
+        <div class="form-group">
+            <label>背番号 (Squad Number)</label>
+            <input type="text" id="reserveSquadNumInput" class="cyber-input" placeholder="例: 007">
+        </div>
+        <button class="cyber-btn" id="btn-reserve" style="width: 100%; margin-top: 1rem;" onclick="submitReserve('${bookId}')">予約する</button>
+    `;
+    openModal(html);
+}
+
+async function submitReserve(bookId) {
+    const squadNum = document.getElementById('reserveSquadNumInput').value;
+    
+    if(!squadNum) {
+        alert("背番号を入力してください。");
+        return;
+    }
+
+    document.getElementById('btn-reserve').disabled = true;
+    document.getElementById('btn-reserve').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 送信中...';
+    
+    const success = await sendAction('reserveBook', { bookId, squadNum });
+    if (success) {
+        const book = mockData.books.find(b => b.id === bookId);
+        if (book) {
+            let currentPreserve = book.preserve ? String(book.preserve).split(',').map(s => s.trim()).filter(Boolean) : [];
+            if (!currentPreserve.includes(String(squadNum))) {
+                currentPreserve.push(String(squadNum));
+                book.preserve = currentPreserve.join(',');
+            }
+        }
+        navigateTo(currentView);
+        closeModal();
     }
 }
 

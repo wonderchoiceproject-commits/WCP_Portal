@@ -1,7 +1,7 @@
 // ==========================================
 // CONFIGURATION & STATE
 // ==========================================
-const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbyk3x66s_1_z0T82h3ZW9coEuyds_u0rEWMk1FMZfxiwuL6N0S6mW81TRcubD7WSzc/exec';
+const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbxWUBROHJ-MDL9wFzRG5-Vq44MjLHH43-lRaMtYDCZr7DbWFRpLrjRNZXf4ppMuybU/exec';
 let currentView = 'home';
 let viewHistory = [];
 let isLoading = true;
@@ -255,6 +255,67 @@ function getMemberNameFromSquad(squadNum) {
 }
 
 function renderHome() {
+    // --- ランキング計算 ---
+    let topTypingScoreMember = null;
+    let topTypingScore = -1;
+    let topMonthlyTypingMember = null;
+    let topMonthlyTypingScore = -1;
+
+    (mockData.members || []).forEach(m => {
+        // タイピング記録（累計）
+        const tScore = parseInt(m.typingScore, 10);
+        if (!isNaN(tScore) && tScore > topTypingScore) {
+            topTypingScore = tScore;
+            topTypingScoreMember = m;
+        }
+
+        // 今月のタイピング記録
+        if (m.monthlyTyping) {
+            const mScoreStr = String(m.monthlyTyping).split('/')[0].replace(/[^0-9]/g, '');
+            const mScore = parseInt(mScoreStr, 10);
+            if (!isNaN(mScore) && mScore > topMonthlyTypingScore) {
+                topMonthlyTypingScore = mScore;
+                topMonthlyTypingMember = m;
+            }
+        }
+    });
+
+    // 読書感想文の集計
+    const reviewCounts = {};
+    const monthlyReviewCounts = {};
+    const currentMonthPrefix = mockData.settings && mockData.settings['Current month'] ? mockData.settings['Current month'].replace('-', '/') : '';
+    
+    (mockData.reviews || []).forEach(r => {
+        const sq = String(r.squadNumber);
+        reviewCounts[sq] = (reviewCounts[sq] || 0) + 1;
+        
+        if (currentMonthPrefix && r.date && r.date.startsWith(currentMonthPrefix)) {
+            monthlyReviewCounts[sq] = (monthlyReviewCounts[sq] || 0) + 1;
+        }
+    });
+
+    let topReviewSq = null;
+    let topReviewCount = 0;
+    Object.keys(reviewCounts).forEach(sq => {
+        if (reviewCounts[sq] > topReviewCount) {
+            topReviewCount = reviewCounts[sq];
+            topReviewSq = sq;
+        }
+    });
+    const topReviewMember = topReviewSq ? (mockData.members || []).find(m => String(m.squadNumber) === topReviewSq) : null;
+
+    let topMonthlyReviewSq = null;
+    let topMonthlyReviewCount = 0;
+    Object.keys(monthlyReviewCounts).forEach(sq => {
+        if (monthlyReviewCounts[sq] > topMonthlyReviewCount) {
+            topMonthlyReviewCount = monthlyReviewCounts[sq];
+            topMonthlyReviewSq = sq;
+        }
+    });
+    const topMonthlyReviewMember = topMonthlyReviewSq ? (mockData.members || []).find(m => String(m.squadNumber) === topMonthlyReviewSq) : null;
+
+    const currentMonthLabel = mockData.settings && mockData.settings['Current month'] ? mockData.settings['Current month'].split('-')[1].replace(/^0/, '') + '月' : '今月';
+
     let html = `
         <div class="view-animate">
             <h1 class="section-title">ホーム</h1>
@@ -294,15 +355,50 @@ function renderHome() {
                     </div>
                 </div>
 
-                <div>
-                    <h3 style="font-family: var(--font-heading); font-size: 4rem; margin-bottom: 1rem; color: var(--accent-yellow); line-height: 1;">お知らせ</h3>
-                    <div class="news-list" style="font-family: var(--font-mono); border-left: 2px solid var(--border-color); padding-left: 1rem; max-height: 250px; overflow-y: auto;">
-                        ${mockData.news.map(item => `
-                            <div class="news-item">
-                                <div class="news-date">${item.date}</div>
-                                <div style="color: var(--text-main); font-size: 1.1rem;">${item.text}</div>
-                            </div>
-                        `).join('')}
+                <div style="background-color: #cda87a; background-image: radial-gradient(#b89467 15%, transparent 16%), radial-gradient(#b89467 15%, transparent 16%); background-size: 16px 16px; background-position: 0 0, 8px 8px; border: 12px solid #6b4c2a; border-radius: 12px; padding: 2rem; box-shadow: inset 0 0 30px rgba(0,0,0,0.4), 10px 10px 30px rgba(0,0,0,0.2);">
+                    <div style="text-align: center;">
+                        <h3 style="font-family: var(--font-heading); font-size: 3.5rem; margin-bottom: 2.5rem; color: #fff; line-height: 1; text-shadow: 2px 2px 6px rgba(0,0,0,0.6); display: inline-block; background: rgba(0,0,0,0.2); padding: 0.8rem 2.5rem; border-radius: 8px; transform: rotate(-1deg); box-shadow: 2px 2px 5px rgba(0,0,0,0.3); border: 1px dashed rgba(255,255,255,0.4);">👑 Honor Board</h3>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                        <!-- タイピング（累計） -->
+                        <div style="background: #fffae6; border-radius: 2px; padding: 2rem 1.5rem 1.5rem; box-shadow: 4px 6px 15px rgba(0,0,0,0.3); position: relative; transform: rotate(-2deg); transition: transform 0.2s ease;">
+                            <div style="position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: 16px; height: 16px; background: radial-gradient(circle at 30% 30%, #ff7675, #d63031); border-radius: 50%; box-shadow: 2px 4px 6px rgba(0,0,0,0.4), inset -2px -2px 4px rgba(0,0,0,0.2);"></div>
+                            <div style="font-size: 0.8rem; color: #777; font-weight: bold; margin-bottom: 0.8rem; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px dashed #ccc; padding-bottom: 0.5rem; text-align: center;">最高タイピング記録</div>
+                            ${topTypingScoreMember ? `
+                                <div style="font-size: 1.2rem; font-weight: 800; color: #2d3436; margin-bottom: 0.3rem; text-align: center;"><i class="fa-solid fa-medal" style="color: #FFD700; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.2));"></i> ${topTypingScoreMember.name || topTypingScoreMember.squadNumber}</div>
+                                <div style="font-size: 1.8rem; font-weight: 900; color: #000; text-align: center;">${topTypingScore} <span style="font-size: 0.8rem; color: #777; font-weight: bold;">SCORE</span></div>
+                            ` : `<div style="color: #999; font-size: 0.9rem; text-align: center;">該当者なし</div>`}
+                        </div>
+
+                        <!-- タイピング（今月） -->
+                        <div style="background: #f0f8ff; border-radius: 2px; padding: 2rem 1.5rem 1.5rem; box-shadow: 4px 6px 15px rgba(0,0,0,0.3); position: relative; transform: rotate(1.5deg); transition: transform 0.2s ease;">
+                            <div style="position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: 16px; height: 16px; background: radial-gradient(circle at 30% 30%, #74b9ff, #0984e3); border-radius: 50%; box-shadow: 2px 4px 6px rgba(0,0,0,0.4), inset -2px -2px 4px rgba(0,0,0,0.2);"></div>
+                            <div style="font-size: 0.8rem; color: #777; font-weight: bold; margin-bottom: 0.8rem; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px dashed #ccc; padding-bottom: 0.5rem; text-align: center;">${currentMonthLabel}のタイピング記録</div>
+                            ${topMonthlyTypingMember ? `
+                                <div style="font-size: 1.2rem; font-weight: 800; color: #2d3436; margin-bottom: 0.3rem; text-align: center;"><i class="fa-solid fa-medal" style="color: #C0C0C0; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.2));"></i> ${topMonthlyTypingMember.name || topMonthlyTypingMember.squadNumber}</div>
+                                <div style="font-size: 1.8rem; font-weight: 900; color: #000; text-align: center;">${topMonthlyTypingScore} <span style="font-size: 0.8rem; color: #777; font-weight: bold;">SCORE</span></div>
+                            ` : `<div style="color: #999; font-size: 0.9rem; text-align: center;">該当者なし</div>`}
+                        </div>
+
+                        <!-- 読書（累計） -->
+                        <div style="background: #fff0f5; border-radius: 2px; padding: 2rem 1.5rem 1.5rem; box-shadow: 4px 6px 15px rgba(0,0,0,0.3); position: relative; transform: rotate(-1deg); transition: transform 0.2s ease;">
+                            <div style="position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: 16px; height: 16px; background: radial-gradient(circle at 30% 30%, #55efc4, #00b894); border-radius: 50%; box-shadow: 2px 4px 6px rgba(0,0,0,0.4), inset -2px -2px 4px rgba(0,0,0,0.2);"></div>
+                            <div style="font-size: 0.8rem; color: #777; font-weight: bold; margin-bottom: 0.8rem; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px dashed #ccc; padding-bottom: 0.5rem; text-align: center;">読書感想文 (累計)</div>
+                            ${topReviewMember ? `
+                                <div style="font-size: 1.2rem; font-weight: 800; color: #2d3436; margin-bottom: 0.3rem; text-align: center;"><i class="fa-solid fa-book-open" style="color: #e84393; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.1));"></i> ${topReviewMember.name || topReviewMember.squadNumber}</div>
+                                <div style="font-size: 1.8rem; font-weight: 900; color: #000; text-align: center;">${topReviewCount} <span style="font-size: 0.8rem; color: #777; font-weight: bold;">冊</span></div>
+                            ` : `<div style="color: #999; font-size: 0.9rem; text-align: center;">該当者なし</div>`}
+                        </div>
+
+                        <!-- 読書（今月） -->
+                        <div style="background: #fdf5e6; border-radius: 2px; padding: 2rem 1.5rem 1.5rem; box-shadow: 4px 6px 15px rgba(0,0,0,0.3); position: relative; transform: rotate(2deg); transition: transform 0.2s ease;">
+                            <div style="position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: 16px; height: 16px; background: radial-gradient(circle at 30% 30%, #ffeaa7, #fdcb6e); border-radius: 50%; box-shadow: 2px 4px 6px rgba(0,0,0,0.4), inset -2px -2px 4px rgba(0,0,0,0.2);"></div>
+                            <div style="font-size: 0.8rem; color: #777; font-weight: bold; margin-bottom: 0.8rem; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px dashed #ccc; padding-bottom: 0.5rem; text-align: center;">${currentMonthLabel}の読書感想文</div>
+                            ${topMonthlyReviewMember ? `
+                                <div style="font-size: 1.2rem; font-weight: 800; color: #2d3436; margin-bottom: 0.3rem; text-align: center;"><i class="fa-solid fa-book-bookmark" style="color: #6c5ce7; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.1));"></i> ${topMonthlyReviewMember.name || topMonthlyReviewMember.squadNumber}</div>
+                                <div style="font-size: 1.8rem; font-weight: 900; color: #000; text-align: center;">${topMonthlyReviewCount} <span style="font-size: 0.8rem; color: #777; font-weight: bold;">冊</span></div>
+                            ` : `<div style="color: #999; font-size: 0.9rem; text-align: center;">該当者なし</div>`}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -352,6 +448,9 @@ function renderBooks() {
         <div class="view-animate">
             ${getBackButtonHtml()}
             <h1 class="section-title">図書管理</h1>
+            <div style="font-size: 0.9rem; color: var(--accent-pink); margin-bottom: 1rem; font-weight: bold; background: var(--bg-main); padding: 0.5rem 1rem; border-radius: 8px; border-left: 4px solid var(--accent-pink); box-shadow: var(--shadow-out); display: inline-block;">
+                <i class="fa-regular fa-clock"></i> 読書感想文 締切: ${mockData.settings['readingDeadLine'] || '未設定'}
+            </div>
             
             <button class="cyber-btn" style="margin-bottom: 1.5rem; width: 100%; font-size: 1.1rem; padding: 1rem;" onclick="openAddReviewModal('', 'other')"><i class="fa-solid fa-pen-nib"></i> 「読書感想文」提出（図書以外の本）</button>
             <div class="cyber-card" style="margin-bottom: 1.5rem; padding: 1rem;">
@@ -555,7 +654,17 @@ window.handleDrop = function(e, deptId) {
     if (member.hasOwnProperty('departmentsIds')) member.departmentsIds = newDeptsStr;
     if (member.hasOwnProperty('DepartmentsIds')) member.DepartmentsIds = newDeptsStr;
 
-    renderRoster();
+    // 再描画（renderRoster）によるツリーの折り畳みを防ぐため、視覚的フィードバックのみ行う
+    const targetNode = document.getElementById(`org-node-${deptId}`);
+    if (targetNode) {
+        const originalBg = targetNode.style.background || '';
+        targetNode.style.background = 'rgba(72, 187, 120, 0.3)'; // accent-green の薄い色
+        targetNode.style.transition = 'background 0.3s ease';
+        setTimeout(() => {
+            targetNode.style.background = originalBg;
+            setTimeout(() => { targetNode.style.transition = ''; }, 300);
+        }, 300);
+    }
 };
 
 
@@ -923,19 +1032,6 @@ function renderRoster() {
     mockData.settings = mockData.settings || {};
 
     const now = new Date();
-    let isTypingPeriod = false;
-    // 古いGASデプロイによって1行目(StartDate)がスキップされているケースを考慮し、どちらかがあれば判定を行う
-    if (mockData.settings.typingStartDate || mockData.settings.typingEndDate) {
-        const start = mockData.settings.typingStartDate ? new Date(mockData.settings.typingStartDate) : new Date(0); // なければ過去として扱う
-        const end = mockData.settings.typingEndDate ? new Date(mockData.settings.typingEndDate) : new Date(2100, 0, 1); // なければ未来として扱う
-        
-        // 終了日はその日の23:59:59までを含める（当日の朝などに消えないように）
-        end.setHours(23, 59, 59, 999);
-
-        if (now >= start && now <= end) {
-            isTypingPeriod = true;
-        }
-    }
 
     let tabsHtml = `
         <div class="schedule-tabs" style="margin-bottom: 2rem;">
@@ -1126,10 +1222,11 @@ function renderRoster() {
                                 </div>
                                 <div style="flex: 1; border-left: 1px dashed var(--border-color); padding-left: 1rem;">
                                     <h4 style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.3rem;">毎月提出</h4>
-                                    <div style="font-weight: bold; margin-bottom: 0.5rem; font-size: 0.9rem;">${member.monthlyTyping || '未提出'}</div>
-                                    ${isTypingPeriod 
-                                        ? `<button class="cyber-btn" style="padding: 0.4rem; font-size: 0.75rem; background: var(--accent-green); color: #fff; border: none;" onclick="event.stopPropagation(); openTypingModal('${member.squadNumber}')"><i class="fa-solid fa-upload"></i> 今月のタイピング記録を提出</button>` 
-                                        : `<div style="font-size: 0.8rem; color: var(--accent-pink); border: 1px solid var(--accent-pink); padding: 0.3rem; border-radius: 4px; text-align: center; max-width: max-content;">期間外</div>`}
+                                    <div style="font-weight: bold; margin-bottom: 0.2rem; font-size: 0.9rem;">${member.monthlyTyping || '未提出'}</div>
+                                    <div style="font-size: 0.7rem; color: var(--accent-pink); margin-bottom: 0.5rem; font-weight: bold;"><i class="fa-regular fa-clock"></i> 締切: ${mockData.settings['typingEndDate'] || '未設定'}</div>
+                                    <button class="cyber-btn" style="padding: 0.4rem; font-size: 0.75rem; background: var(--accent-green); color: #fff; border: none;" onclick="event.stopPropagation(); openTypingModal('${member.squadNumber}')">
+                                        <i class="fa-solid fa-upload"></i> ${(mockData.settings['Current month'] ? mockData.settings['Current month'].split('-')[1].replace(/^0/, '') : '今')}月タイピング提出
+                                    </button>
                                 </div>
                             </div>
 

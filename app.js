@@ -1,7 +1,7 @@
 // ==========================================
 // CONFIGURATION & STATE
 // ==========================================
-const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbxWUBROHJ-MDL9wFzRG5-Vq44MjLHH43-lRaMtYDCZr7DbWFRpLrjRNZXf4ppMuybU/exec';
+const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwVGpzCQ-5bRdYiqb8zUgj19U0fQkVdl3bqPIQvnnB7NFVCls7UK0koa-QEm6xwbUI/exec';
 let currentView = 'home';
 let viewHistory = [];
 let isLoading = true;
@@ -193,7 +193,7 @@ async function fetchPortalData() {
                 <div style="color: var(--accent-blue); letter-spacing: 2px; font-size: 1.5rem;">LOADING...</div>
             </div>`;
 
-        const response = await fetch(GAS_API_URL);
+        const response = await fetch(GAS_API_URL + (GAS_API_URL.includes('?') ? '&' : '?') + 't=' + new Date().getTime());
         const data = await response.json();
 
         // 取得したデータで上書き
@@ -1154,8 +1154,14 @@ function renderRoster() {
                     return `
                     <div class="cyber-card member-card" style="cursor: pointer;" onclick="toggleMemberDetails('${member.squadNumber}')">
                         <div class="profile-header" style="margin-bottom: 0;">
-                            <div class="avatar">${member.squadNumber}</div>
-                            <div class="profile-info" style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
+                                <div class="avatar" style="overflow: hidden; position: relative; padding: 0; cursor: pointer;" onclick="event.stopPropagation(); triggerPhotoUpload('${member.squadNumber}')" title="写真を追加・変更する">
+                                    <img src="${member.photo || member.image || `images/${member.squadNumber}.jpg`}" alt="" style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; z-index: 10;" onerror="this.style.display='none';">
+                                    ${member.squadNumber}
+                                </div>
+                                <button class="cyber-btn" style="padding: 0.2rem 0.5rem; font-size: 0.65rem; border-radius: 10px;" onclick="event.stopPropagation(); triggerPhotoUpload('${member.squadNumber}')"><i class="fa-solid fa-camera"></i> 写真変更</button>
+                            </div>
+                            <div class="profile-info" style="flex: 1; display: flex; flex-direction: column; justify-content: center; padding-left: 1rem;">
                                 <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; flex-wrap: wrap;">
                                     <h3 style="color: var(--accent-green); font-size: 1.4rem; margin: 0;">${member.name}</h3>
                                     ${member.badges && member.badges.length > 0 ? member.badges.map(badge => {
@@ -2746,3 +2752,111 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+// ==========================================
+// CROPPER & PHOTO UPLOAD
+// ==========================================
+let cropper = null;
+let currentUploadSquadNum = null;
+
+function triggerPhotoUpload(squadNum) {
+    currentUploadSquadNum = squadNum;
+    const input = document.getElementById('memberPhotoInput');
+    input.value = ''; // Reset
+    input.click();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const input = document.getElementById('memberPhotoInput');
+    if (input) {
+        input.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = document.getElementById('cropper-image');
+                    img.src = e.target.result;
+                    document.getElementById('cropper-modal').classList.remove('hidden');
+                    
+                    if (cropper) {
+                        cropper.destroy();
+                    }
+                    cropper = new Cropper(img, {
+                        aspectRatio: 1,
+                        viewMode: 1,
+                        dragMode: 'move',
+                        autoCropArea: 1,
+                        restore: false,
+                        guides: true,
+                        center: true,
+                        highlight: false,
+                        cropBoxMovable: true,
+                        cropBoxResizable: true,
+                        toggleDragModeOnDblclick: false,
+                    });
+                };
+                reader.readAsDataURL(e.target.files[0]);
+            }
+        });
+    }
+});
+
+function closeCropperModal() {
+    document.getElementById('cropper-modal').classList.add('hidden');
+    if (cropper) {
+        cropper.destroy();
+        cropper = null;
+    }
+    currentUploadSquadNum = null;
+}
+
+function cropAndUpload() {
+    if (!cropper || !currentUploadSquadNum) return;
+    
+    const btn = document.getElementById('btn-crop-upload');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> アップロード中...';
+    btn.disabled = true;
+
+    const canvas = cropper.getCroppedCanvas({
+        width: 400,
+        height: 400,
+        imageSmoothingEnabled: true,
+        imageSmoothingQuality: 'high',
+    });
+    
+    const base64Data = canvas.toDataURL('image/jpeg', 0.8);
+    
+    // API Call
+    fetch(GAS_API_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+            action: 'uploadMemberPhoto',
+            squadNum: currentUploadSquadNum,
+            imageBase64: base64Data
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        
+        if (data.success) {
+            closeCropperModal();
+            // Update mockData
+            const m = mockData.members.find(x => String(x.squadNumber) === String(currentUploadSquadNum));
+            if (m) {
+                m.photo = data.url; // url will be returned from GAS
+            }
+            renderRoster(); // Re-render to show new image
+            alert("アップロードが完了しました！");
+        } else {
+            alert("エラー: " + data.error);
+        }
+    })
+    .catch(err => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        alert("通信エラーが発生しました。");
+        console.error(err);
+    });
+}

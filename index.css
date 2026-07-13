@@ -1550,3 +1550,6 @@ body:has(#app-root .fa-triangle-exclamation) .dynamic-loader-overlay {
     60% { transform: scale(1.2); opacity: 1; }
     100% { transform: scale(1); opacity: 1; }
 }
+/* Cropper.js Overrides */
+.cropper-view-box, .cropper-face { border-radius: 50%; }
+.avatar img { border-radius: 50%; object-fit: cover; aspect-ratio: 1/1; }

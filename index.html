@@ -10,6 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&family=Zen+Maru+Gothic:wght@400;700;900&display=swap" rel="stylesheet">
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
     <link rel="stylesheet" href="index.css">
 </head>
 <body>
@@ -224,6 +225,23 @@
         </div>
     </div>
 
+    <!-- Cropper Modal for Face Photo -->
+    <div id="cropper-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="max-width: 500px; padding: 1.5rem;">
+            <button class="modal-close" onclick="closeCropperModal()"><i class="fa-solid fa-xmark"></i></button>
+            <h2 style="margin-bottom: 1rem; color: var(--accent-green);"><i class="fa-solid fa-crop-simple"></i> 写真の切り抜き</h2>
+            <div style="width: 100%; max-height: 400px; margin-bottom: 1rem; background: var(--bg-main); display: flex; justify-content: center; align-items: center; border: 1px dashed var(--border-color);">
+                <img id="cropper-image" src="" style="max-width: 100%; display: block;">
+            </div>
+            <div style="display: flex; gap: 1rem;">
+                <button class="cyber-btn" style="flex: 1; background: var(--bg-main); color: var(--text-main);" onclick="closeCropperModal()">CANCEL</button>
+                <button class="cyber-btn" id="btn-crop-upload" style="flex: 2;" onclick="cropAndUpload()"><i class="fa-solid fa-cloud-arrow-up"></i> CROP & UPLOAD</button>
+            </div>
+        </div>
+    </div>
+    <input type="file" id="memberPhotoInput" accept="image/*" style="display: none;">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

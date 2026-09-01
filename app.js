@@ -1,7 +1,16 @@
 // ==========================================
 // CONFIGURATION & STATE
 // ==========================================
-const GAS_API_URL = 'https://script.google.com/macros/s/AKfycby3JQTKYyq4r7n3aDtjWt5UKHZHOXSpWPwrhSPzTZB5OXI0m7rapjxscmbKUvOgJGc/exec';
+const supabaseUrl = 'https://ouflqodgegugznmmlkpt.supabase.co';
+// ⚠️ 移行対応: 既存のGAS同等のアクセス権を保つため service_role を使用。公開環境ではanon keyへの切り替えを推奨します。
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im91Zmxxb2RnZWd1Z3pubW1sa3B0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4ODEyNDkxMiwiZXhwIjoyMTAzNzAwOTEyfQ.HrFGGMUDAxgtVQ5M6psk6EsVcheU6cL-0jYtrQLOn3U';
+window.supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+// Docs読み取り・写真アップロード用のGAS (後ほど新しいURLに書き換えます)
+const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbyzxm6kng2G6jI4lej_FR8e9aC0LswY9gAh07yOiPCRxixhFd5Gm9ZhhnUJxDqAnA/exec';
+
+const DISCORD_WEBHOOK_URL_PORTAL = 'https://discord.com/api/webhooks/1413674829080563834/EW_nJCjxwl1AkEgKAnfTGHHPC_RDplGqj6A_LMOnT4usoNr9KsSJ_BxmalvVFtdPeYhd';
+const DISCORD_WEBHOOK_URL_LIBRARY = 'https://discord.com/api/webhooks/1524715463928451122/zpkYVX5suAaakeDXumnfN1_Bq5gIq3Z70wGpNXTZY7xe2NyfDYy0GgGjrNizb8SX5ewo';
 let currentView = 'home';
 let viewHistory = [];
 let isLoading = true;
@@ -186,21 +195,46 @@ function getBackButtonHtml() {
 async function fetchPortalData() {
     isLoading = true;
     try {
-        // ロード中のポップな演出
         appRoot.innerHTML = `
             <div style="text-align:center; margin-top:5rem; font-family: var(--font-heading);">
                 <i class="fa-solid fa-spinner fa-spin" style="font-size: 3rem; margin-bottom: 1rem; color: var(--accent-blue);"></i>
                 <div style="color: var(--accent-blue); letter-spacing: 2px; font-size: 1.5rem;">LOADING...</div>
             </div>`;
 
-        const response = await fetch(GAS_API_URL + (GAS_API_URL.includes('?') ? '&' : '?') + 't=' + new Date().getTime());
-        const data = await response.json();
+        // Supabaseから6つのテーブルを並行して取得
+        const [
+            { data: settingsData },
+            { data: departmentsData },
+            { data: membersData },
+            { data: booksData },
+            { data: eventsData },
+            { data: reviewsData }
+        ] = await Promise.all([
+            supabase.from('settings').select('*'),
+            supabase.from('departments').select('*').order('created_at'),
+            supabase.from('members').select('*'),
+            supabase.from('books').select('*'),
+            supabase.from('events').select('*'),
+            supabase.from('reviews').select('*')
+        ]);
 
-        // 取得したデータで上書き
-        mockData = data;
+        // settingsを key-value オブジェクト化
+        const settingsObj = {};
+        if (settingsData) {
+            settingsData.forEach(s => { settingsObj[s.key] = s.value; });
+        }
+
+        mockData = {
+            settings: settingsObj,
+            departments: departmentsData || [],
+            members: membersData || [],
+            books: booksData || [],
+            events: eventsData || [],
+            reviews: reviewsData || [],
+            news: [] // 現在のUIの要件を満たすため空配列
+        };
+
         isLoading = false;
-
-        // データ取得完了後に現在のビューを描画
         navigateTo(currentView);
     } catch (error) {
         isLoading = false;
@@ -218,23 +252,203 @@ async function fetchPortalData() {
 // 汎用のデータ送信処理
 async function sendAction(action, payload) {
     try {
-        const response = await fetch(GAS_API_URL, {
-            method: 'POST',
-            // CORSのpreflightを回避するために text/plain で送信
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({ action, ...payload })
-        });
-        
-        const result = await response.json();
-        if(result.success) {
-            return true;
-        } else {
-            alert("エラー: " + result.error);
-            return false;
+        let result = false;
+        switch(action) {
+            case 'submitTyping': {
+                const member = mockData.members.find(m => String(m.squadNumber) === String(payload.squadNum));
+                const { error } = await supabase.from('members')
+                    .update({ monthlyTyping: payload.course + "円コース", typingScore: payload.score })
+                    .eq('squadNumber', payload.squadNum);
+                if (error) throw error;
+                
+                if (payload.imageBase64) {
+                    const res = await fetch(payload.imageBase64);
+                    const blob = await res.blob();
+                    const formData = new FormData();
+                    formData.append("content", `⌨️ **タイピング記録提出**\n名前: ${member ? member.name : payload.squadNum}\nコース: ${payload.course}円コース\nスコア: ${payload.score}`);
+                    formData.append("file", blob, payload.filename || "typing.jpg");
+                    await fetch(DISCORD_WEBHOOK_URL_PORTAL, { method: 'POST', body: formData });
+                }
+                result = true;
+                break;
+            }
+            case 'borrowBook': {
+                const { error } = await supabase.from('books')
+                    .update({ borrower: payload.squadNum, dueDate: payload.dueDate, status: '貸出中' })
+                    .eq('id', payload.bookId);
+                if (error) throw error;
+                result = true;
+                break;
+            }
+            case 'returnBook': {
+                const { error } = await supabase.from('books')
+                    .update({ borrower: null, dueDate: null, status: '在庫あり' })
+                    .eq('id', payload.bookId);
+                if (error) throw error;
+                result = true;
+                break;
+            }
+            case 'reserveBook': {
+                const { error } = await supabase.from('books')
+                    .update({ borrower: payload.squadNum, dueDate: null, status: '予約中' })
+                    .eq('id', payload.bookId);
+                if (error) throw error;
+                result = true;
+                break;
+            }
+            case 'updateAttendance': {
+                const event = mockData.events.find(e => String(e.id) === String(payload.eventId));
+                if (!event) throw new Error('Event not found');
+                
+                let att = event.attendees ? String(event.attendees).split(',').map(s=>s.trim()).filter(s=>s) : [];
+                let abs = event.absentees ? String(event.absentees).split(',').map(s=>s.trim()).filter(s=>s) : [];
+                
+                // 既存から削除
+                att = att.filter(s => s !== payload.squadNum);
+                abs = abs.filter(s => s !== payload.squadNum);
+                
+                if (payload.status === 'attend') att.push(payload.squadNum);
+                if (payload.status === 'absent') abs.push(payload.squadNum);
+                
+                const updates = { attendees: att.join(', '), absentees: abs.join(', ') };
+                const { error } = await supabase.from('events').update(updates).eq('id', payload.eventId);
+                if (error) throw error;
+                result = true;
+                break;
+            }
+            case 'addEvent': {
+                const { error } = await supabase.from('events').insert([{
+                    title: payload.title,
+                    date: payload.date,
+                    startTime: payload.startTime,
+                    endTime: payload.endTime,
+                    location: payload.location,
+                    description: payload.description,
+                    capacity: payload.capacity,
+                    host: payload.host,
+                    color: payload.color
+                }]);
+                if (error) throw error;
+                
+                await fetch(DISCORD_WEBHOOK_URL_PORTAL, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ content: `📅 **新しいイベントが追加されました**\n${payload.title}\n日程: ${payload.date}`})
+                });
+                result = true;
+                break;
+            }
+            case 'editEvent': {
+                const { error } = await supabase.from('events').update({
+                    title: payload.title,
+                    date: payload.date,
+                    startTime: payload.startTime,
+                    endTime: payload.endTime,
+                    location: payload.location,
+                    description: payload.description,
+                    capacity: payload.capacity,
+                    host: payload.host,
+                    color: payload.color
+                }).eq('id', payload.id);
+                if (error) throw error;
+                result = true;
+                break;
+            }
+            case 'deleteEvent': {
+                const { error } = await supabase.from('events').delete().eq('id', payload.eventId);
+                if (error) throw error;
+                result = true;
+                break;
+            }
+            case 'updateMemberField': {
+                const updates = {};
+                updates[payload.fieldName] = payload.newValue;
+                const { error } = await supabase.from('members').update(updates).eq('squadNumber', payload.squadNum);
+                if (error) throw error;
+                result = true;
+                break;
+            }
+            case 'addReview': {
+                const { error } = await supabase.from('reviews').insert([{
+                    squadNumber: payload.squadNum,
+                    bookId: payload.bookId,
+                    bookTitle: payload.bookTitle,
+                    docLink: payload.docLink,
+                    date: payload.date,
+                    reviewer: payload.reviewer
+                }]);
+                if (error) throw error;
+                
+                await fetch(DISCORD_WEBHOOK_URL_LIBRARY, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ content: `📚 **新しいレビューが追加されました**\n本: ${payload.bookTitle}\nレビュアー: ${payload.reviewer}\nリンク: ${payload.docLink}`})
+                });
+                result = true;
+                break;
+            }
+            case 'batchUpdateMemberDepartments': {
+                for (const u of payload.updates) {
+                    await supabase.from('members').update({ departmentIds: u.departmentIds }).eq('squadNumber', u.squadNum);
+                }
+                result = true;
+                break;
+            }
+            case 'updateMemberCategory': {
+                const member = mockData.members.find(m => String(m.squadNumber) === String(payload.squadNum));
+                const achievements = member.achievements_and_flags || {};
+                achievements[payload.fieldName] = payload.newValue;
+                const { error } = await supabase.from('members')
+                    .update({ achievements_and_flags: achievements })
+                    .eq('squadNumber', payload.squadNum);
+                if (error) throw error;
+                result = true;
+                break;
+            }
+            case 'updateMemberBadge': {
+                const member = mockData.members.find(m => String(m.squadNumber) === String(payload.squadNum));
+                let badges = member.badges || [];
+                if (payload.isRemove) {
+                    badges = badges.filter(b => !b.includes(payload.badgeName));
+                } else {
+                    badges.push(`<span class="badge" style="background:${payload.badgeColor};">${payload.badgeName}</span>`);
+                }
+                const { error } = await supabase.from('members').update({ badges: badges }).eq('squadNumber', payload.squadNum);
+                if (error) throw error;
+                result = true;
+                break;
+            }
+            case 'updateMemberDepartment': {
+                const member = mockData.members.find(m => String(m.squadNumber) === String(payload.squadNum));
+                let depts = member.departmentIds || [];
+                if (payload.isRemove) {
+                    depts = depts.filter(d => !d.startsWith(payload.deptId));
+                } else {
+                    const newDept = payload.title ? `${payload.deptId}(${payload.title})` : payload.deptId;
+                    depts.push(newDept);
+                }
+                const { error } = await supabase.from('members').update({ departmentIds: depts }).eq('squadNumber', payload.squadNum);
+                if (error) throw error;
+                result = true;
+                break;
+            }
+            default: {
+                console.warn("Unknown action routed to GAS fallback: " + action);
+                const fallbackResponse = await fetch(GAS_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({ action, ...payload })
+                });
+                const res = await fallbackResponse.json();
+                result = res.success;
+                if (!result) alert("エラー: " + res.error);
+                break;
+            }
         }
+        return result;
     } catch (error) {
         console.error("送信エラー:", error);
-        alert("通信エラーが発生しました。データが保存されていない可能性があります。");
+        alert("通信エラーが発生しました: " + (error.message || JSON.stringify(error)));
         return false;
     }
 }

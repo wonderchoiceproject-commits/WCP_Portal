@@ -173,14 +173,28 @@
             <button class="nav-btn" data-view="books"><i class="fa-solid fa-book"></i> 図書管理</button>
             <button class="nav-btn" data-view="roster"><i class="fa-solid fa-users"></i> 名簿</button>
         </nav>
-        <div class="user-status">
-            <i class="fa-solid fa-face-smile" style="color: var(--accent-blue);"></i> 稼働中
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <button id="nav-admin-btn" class="cyber-btn" onclick="window.location.href='admin.html'" style="display: none; padding: 0.4rem 0.8rem; font-size: 0.8rem; background: var(--bg-surface); color: var(--text-main); border: 1px solid var(--border-color);"><i class="fa-solid fa-gear"></i> 管理画面</button>
+            <div class="user-status">
+                <i class="fa-solid fa-face-smile" style="color: var(--accent-blue);"></i> 稼働中
+            </div>
         </div>
     </header>
 
     <main id="app-root" class="container">
         <!-- Dynamic content will be injected here -->
     </main>
+
+    <!-- Login Modal -->
+    <div id="login-overlay" class="modal-overlay" style="z-index: 9999; display: flex;">
+        <div class="modal-content" style="max-width: 400px; text-align: center; padding: 2rem;">
+            <h2 style="font-family: var(--font-heading); color: var(--accent-blue); margin-bottom: 1rem;">WCP PORTAL<br>ログイン</h2>
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">ご利用の背番号（Squad Number）を入力してください</p>
+            <input type="text" id="login-squad-input" class="cyber-input" placeholder="例: 001" style="text-align: center; font-size: 1.2rem; font-weight: bold; margin-bottom: 1.5rem;">
+            <button class="cyber-btn" onclick="performLogin()" style="width: 100%;">ログイン</button>
+            <div id="login-error" style="color: var(--accent-pink); font-size: 0.85rem; margin-top: 1rem; display: none;"></div>
+        </div>
+    </div>
 
     <!-- Global Modal for Interactions (e.g., Borrowing, Attendance) -->
     <div id="modal-overlay" class="modal-overlay hidden">

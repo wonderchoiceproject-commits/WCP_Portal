@@ -1,0 +1,5 @@
+ポータル通知チャンネル
+https://discord.com/api/webhooks/1413674829080563834/EW_nJCjxwl1AkEgKAnfTGHHPC_RDplGqj6A_LMOnT4usoNr9KsSJ_BxmalvVFtdPeYhd
+
+図書館チャンネル
+https://discord.com/api/webhooks/1524715463928451122/zpkYVX5suAaakeDXumnfN1_Bq5gIq3Z70wGpNXTZY7xe2NyfDYy0GgGjrNizb8SX5ewo

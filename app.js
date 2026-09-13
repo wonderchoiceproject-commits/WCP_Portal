@@ -1211,7 +1211,11 @@ function renderRoster() {
             name: getDeptName(d)
         })).filter(p => p.id && p.name);
 
-        let membersToRender = mockData.members;
+        let membersToRender = [...mockData.members].sort((a, b) => {
+            const numA = parseInt(a.squadNumber, 10) || 0;
+            const numB = parseInt(b.squadNumber, 10) || 0;
+            return numA - numB;
+        });
 
         // Apply Search Filter
         if (currentRosterSearch) {

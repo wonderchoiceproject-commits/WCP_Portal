@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ツールマニュアル | WCP Member Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&family=Zen+Maru+Gothic:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+    <div class="pop-background-pattern"></div>
+
+    <header class="topbar">
+        <div class="logo">
+            <span class="pop-text">WCP</span>
+            <span class="sub-logo">PORTAL</span>
+        </div>
+        <nav class="main-nav">
+            <button class="nav-btn" data-view="home" onclick="window.location.href='index.html?view=home'"><i class="fa-solid fa-house"></i> ホーム</button>
+            <button class="nav-btn" data-view="schedule" onclick="window.location.href='index.html?view=schedule'"><i class="fa-solid fa-calendar-days"></i> スケジュール</button>
+            <button class="nav-btn" data-view="books" onclick="window.location.href='index.html?view=books'"><i class="fa-solid fa-book"></i> 図書管理</button>
+            <button class="nav-btn" data-view="roster" onclick="window.location.href='index.html?view=roster'"><i class="fa-solid fa-users"></i> 名簿</button>
+        </nav>
+        <div class="user-status">
+            <i class="fa-solid fa-face-smile" style="color: var(--accent-blue);"></i> 稼働中
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="view-animate">
+            <button class="cyber-btn" style="margin-bottom: 1.5rem;" onclick="window.location.href='index.html'"><i class="fa-solid fa-arrow-left"></i> ホームへ戻る</button>
+            <h1 class="section-title">マニュアル: ツール</h1>
+            
+            <div class="cyber-card" style="margin-bottom: 2rem;">
+                <h2 style="font-family: var(--font-heading); font-size: 2.5rem; color: var(--accent-blue); margin-bottom: 1rem;">
+                    利用推奨ツール
+                </h2>
+                <div style="background: var(--surface-color); padding: 2rem; color: var(--text-main); border-radius: 20px; box-shadow: var(--shadow-in); line-height: 1.8;">
+                    <p style="font-weight: 700; margin-bottom: 1rem;">WCPでは、円滑なコミュニケーションと業務遂行のために以下のツールの利用を推奨しています。</p>
+                    
+                    <h3 style="color: var(--accent-green); margin-top: 1.5rem; margin-bottom: 0.5rem;"><i class="fa-brands fa-slack"></i> Slack / LINE (コミュニケーション)</h3>
+                    <p style="font-weight: 700; margin-bottom: 1rem;">日々の連絡、プロジェクトごとの進行状況の共有に使用します。メンション（@）を適切に活用し、見落としを防ぎましょう。</p>
+
+                    <h3 style="color: var(--accent-blue); margin-top: 1.5rem; margin-bottom: 0.5rem;"><i class="fa-brands fa-google-drive"></i> Google Workspace (ドキュメント管理)</h3>
+                    <p style="font-weight: 700; margin-bottom: 1rem;">企画書、議事録、マニュアル等の資料はGoogle ドキュメント、スプレッドシート、スライドで作成し、共有ドライブに保存してください。</p>
+
+                    <h3 style="color: var(--accent-pink); margin-top: 1.5rem; margin-bottom: 0.5rem;"><i class="fa-solid fa-video"></i> Google Meet / Zoom (オンライン会議)</h3>
+                    <p style="font-weight: 700;">リモートでのミーティングに使用します。ミーティングの際は議事録担当者を決め、決定事項を必ずテキストで残すようにしてください。</p>
+                </div>
+            </div>
+            
+            <div class="cyber-card">
+                <h2 style="font-family: var(--font-heading); font-size: 2.5rem; color: var(--accent-yellow); margin-bottom: 1rem;">
+                    情報セキュリティ
+                </h2>
+                <ul style="padding-left: 1.5rem; line-height: 1.8; font-weight: 700;">
+                    <li>WCP内部の情報を外部（SNS等）に許可なく公開しないこと。</li>
+                    <li>共有アカウントのパスワードは厳重に管理し、退会者が出た場合は速やかに変更すること。</li>
+                    <li>不審なメールやリンクは開かず、管理者に報告すること。</li>
+                </ul>
+            </div>
+        </div>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>

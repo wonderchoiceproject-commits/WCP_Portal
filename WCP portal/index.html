@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WCP Member Portal</title>
+    <!-- Fonts: Shrikhand for headings, Noto Sans JP for body -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&family=Zen+Maru+Gothic:wght@400;700;900&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+    <!-- Dynamic Typography Loading Screen -->
+    <div id="dynamic-loader" class="dynamic-loader-overlay">
+        <!-- Background floating shapes -->
+        <div class="floating-clay shape1"></div>
+        <div class="floating-clay shape2"></div>
+        <div class="floating-clay shape3"></div>
+        
+        <!-- Letters container for physics bounce -->
+        <div id="physics-letters-container"></div>
+    </div>
+    
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const words = ["WONDER", "CHOICE", "PROJECT"];
+            const container = document.getElementById("physics-letters-container");
+            const overlay = document.getElementById("dynamic-loader");
+            if (!container || !overlay) return;
+            
+            const particles = [];
+            const radius = 30; // 60x60 block size -> 30px radius
+            
+            // 1. Arrange letters into words initially
+            words.forEach((wordText) => {
+                const group = document.createElement("div");
+                group.className = "word-group";
+                for (let i = 0; i < wordText.length; i++) {
+                    const el = document.createElement("div");
+                    el.className = "clay-letter";
+                    el.textContent = wordText[i];
+                    group.appendChild(el);
+                    particles.push({ el: el });
+                }
+                container.appendChild(group);
+            });
+            
+            // 2. Wait for entrance animation to finish, then EXPLODE!
+            setTimeout(() => {
+                // Check if already completely faded out
+                const overlayOpacity = parseFloat(window.getComputedStyle(overlay).opacity);
+                if (overlayOpacity <= 0) return;
+                
+                // Capture exact positions on screen
+                particles.forEach(p => {
+                    const rect = p.el.getBoundingClientRect();
+                    p.x = rect.left + rect.width / 2;
+                    p.y = rect.top + rect.height / 2;
+                    p.radius = radius;
+                    p.mass = 1;
+                    
+                    // Assign velocity exploding outwards from the center of the screen
+                    const cx = window.innerWidth / 2;
+                    const cy = window.innerHeight / 2;
+                    const angle = Math.atan2(p.y - cy, p.x - cx) + (Math.random() - 0.5) * 0.5;
+                    const speed = 7 + Math.random() * 5;
+                    p.vx = Math.cos(angle) * speed;
+                    p.vy = Math.sin(angle) * speed;
+                });
+                
+                // Detach from flexbox, attach to overlay with absolute positioning
+                particles.forEach(p => {
+                    p.el.style.animation = 'none'; // Stop CSS animation to allow JS transform
+                    overlay.appendChild(p.el);
+                    p.el.style.position = 'absolute';
+                    p.el.style.left = '0px';
+                    p.el.style.top = '0px';
+                    p.el.style.margin = '0px';
+                    p.el.style.transform = `translate(${p.x - p.radius}px, ${p.y - p.radius}px)`;
+                });
+                
+                // Remove the empty flex containers
+                if (container.parentNode) {
+                    container.parentNode.removeChild(container);
+                }
+                
+                // 3. Start Physics Loop
+                let animationId;
+                function update() {
+                    const currentOpacity = parseFloat(window.getComputedStyle(overlay).opacity);
+                    if (currentOpacity <= 0) {
+                        cancelAnimationFrame(animationId);
+                        return;
+                    }
+                    
+                    const width = window.innerWidth;
+                    const height = window.innerHeight;
+                    
+                    for (let i = 0; i < particles.length; i++) {
+                        let p = particles[i];
+                        p.x += p.vx;
+                        p.y += p.vy;
+                        
+                        // Edge bounce
+                        if (p.x - p.radius < 0) { p.x = p.radius; p.vx *= -1; }
+                        if (p.x + p.radius > width) { p.x = width - p.radius; p.vx *= -1; }
+                        if (p.y - p.radius < 0) { p.y = p.radius; p.vy *= -1; }
+                        if (p.y + p.radius > height) { p.y = height - p.radius; p.vy *= -1; }
+                        
+                        p.el.style.transform = `translate(${p.x - p.radius}px, ${p.y - p.radius}px)`;
+                    }
+                    
+                    // Particle-Particle Elastic Collisions
+                    for (let i = 0; i < particles.length; i++) {
+                        for (let j = i + 1; j < particles.length; j++) {
+                            let p1 = particles[i];
+                            let p2 = particles[j];
+                            let dx = p2.x - p1.x;
+                            let dy = p2.y - p1.y;
+                            let distSq = dx*dx + dy*dy;
+                            let minDist = p1.radius + p2.radius;
+                            
+                            if (distSq < minDist * minDist) {
+                                let dist = Math.sqrt(distSq);
+                                if(dist === 0) { dx = 1; dist = 1; }
+                                
+                                let nx = dx / dist;
+                                let ny = dy / dist;
+                                
+                                let rvx = p2.vx - p1.vx;
+                                let rvy = p2.vy - p1.vy;
+                                let velAlongNormal = rvx * nx + rvy * ny;
+                                
+                                if (velAlongNormal < 0) {
+                                    let impulse = -(1 + 1) * velAlongNormal / (1/p1.mass + 1/p2.mass);
+                                    let impulseX = impulse * nx;
+                                    let impulseY = impulse * ny;
+                                    
+                                    p1.vx -= impulseX / p1.mass;
+                                    p1.vy -= impulseY / p1.mass;
+                                    p2.vx += impulseX / p2.mass;
+                                    p2.vy += impulseY / p2.mass;
+                                    
+                                    let overlap = minDist - dist;
+                                    p1.x -= nx * overlap * 0.5;
+                                    p1.y -= ny * overlap * 0.5;
+                                    p2.x += nx * overlap * 0.5;
+                                    p2.y += ny * overlap * 0.5;
+                                }
+                            }
+                        }
+                    }
+                    animationId = requestAnimationFrame(update);
+                }
+                animationId = requestAnimationFrame(update);
+            }, 1200); // Wait 1.2s before exploding
+        });
+    </script>
+    <!-- Background removed for claymorphism -->
+
+    <header class="topbar">
+        <div class="logo">
+            <span class="pop-text">WCP</span>
+            <span class="sub-logo">PORTAL</span>
+        </div>
+        <nav class="main-nav">
+            <button class="nav-btn active" data-view="home"><i class="fa-solid fa-house"></i> ホーム</button>
+            <button class="nav-btn" data-view="schedule"><i class="fa-solid fa-calendar-days"></i> スケジュール</button>
+            <button class="nav-btn" data-view="books"><i class="fa-solid fa-book"></i> 図書管理</button>
+            <button class="nav-btn" data-view="roster"><i class="fa-solid fa-users"></i> 名簿</button>
+            <button class="nav-btn" data-view="learning"><i class="fa-solid fa-graduation-cap"></i> カテゴリー</button>
+        </nav>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <button id="nav-admin-btn" class="cyber-btn" onclick="window.location.href='admin.html'" style="display: none; padding: 0.4rem 0.8rem; font-size: 0.8rem; background: var(--bg-surface); color: var(--text-main); border: 1px solid var(--border-color);"><i class="fa-solid fa-gear"></i> 管理画面</button>
+            <div class="user-status">
+                <i class="fa-solid fa-face-smile" style="color: var(--accent-blue);"></i> 稼働中
+            </div>
+        </div>
+    </header>
+
+    <main id="app-root" class="container">
+        <!-- Dynamic content will be injected here -->
+    </main>
+
+    <!-- Login Modal -->
+    <div id="login-overlay" class="modal-overlay" style="z-index: 9999; display: flex;">
+        <div class="modal-content" style="max-width: 400px; text-align: center; padding: 2rem;">
+            <h2 style="font-family: var(--font-heading); color: var(--accent-blue); margin-bottom: 1rem;">WCP PORTAL<br>ログイン</h2>
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">ご利用の背番号（Squad Number）を入力してください</p>
+            <input type="text" id="login-squad-input" class="cyber-input" placeholder="例: 001" style="text-align: center; font-size: 1.2rem; font-weight: bold; margin-bottom: 1.5rem;">
+            <button class="cyber-btn" onclick="performLogin()" style="width: 100%;">ログイン</button>
+            <div id="login-error" style="color: var(--accent-pink); font-size: 0.85rem; margin-top: 1rem; display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Global Modal for Interactions (e.g., Borrowing, Attendance) -->
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div class="modal-content">
+            <button id="modal-close" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- Document Viewer Modal -->
+    <div id="doc-viewer-overlay" class="modal-overlay hidden">
+        <div class="modal-content doc-viewer-content">
+            <button id="doc-viewer-close" class="modal-close" onclick="closeDocViewerModal()"><i class="fa-solid fa-xmark"></i></button>
+            <h2 id="doc-viewer-title" style="margin-bottom: 1rem; color: var(--accent-green); border-bottom: 1px dashed var(--border-color); padding-bottom: 0.5rem;"></h2>
+            <div id="doc-viewer-body" class="doc-viewer-body"></div>
+        </div>
+    </div>
+
+    <!-- Typing Record Submission Modal -->
+    <div id="typing-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeTypingModal()"><i class="fa-solid fa-xmark"></i></button>
+            <h2 style="margin-bottom: 1rem; color: var(--accent-green);"><i class="fa-solid fa-keyboard"></i> タイピング記録提出</h2>
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label style="display: block; margin-bottom: 0.5rem; color: var(--accent-blue);">コース選択</label>
+                <select id="typingCourse" class="cyber-input" style="width: 100%; padding: 0.5rem; background: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 4px;">
+                    <option value="3000">3000円コース</option>
+                    <option value="5000">5000円コース</option>
+                    <option value="10000">10000円コース</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label style="display: block; margin-bottom: 0.5rem; color: var(--accent-blue);">記録 (スコア)</label>
+                <input type="number" id="typingScore" class="cyber-input" placeholder="例: 250" style="width: 100%; padding: 0.5rem; background: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 4px;">
+            </div>
+            <div class="form-group" style="margin-bottom: 1.5rem;">
+                <label style="display: block; margin-bottom: 0.5rem; color: var(--accent-blue);">スクショ画像</label>
+                <input type="file" id="typingImage" class="cyber-input" accept="image/*" style="width: 100%; padding: 0.5rem; background: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 4px;">
+            </div>
+            <input type="hidden" id="typingSquadNum">
+            <button class="cyber-btn" id="btn-submit-typing" style="width: 100%; margin-top: 1rem; padding: 0.8rem;" onclick="submitTyping()"><i class="fa-solid fa-paper-plane"></i> 送信</button>
+        </div>
+    </div>
+
+    <!-- Cropper Modal for Face Photo -->
+    <div id="cropper-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="max-width: 500px; padding: 1.5rem;">
+            <button class="modal-close" onclick="closeCropperModal()"><i class="fa-solid fa-xmark"></i></button>
+            <h2 style="margin-bottom: 1rem; color: var(--accent-green);"><i class="fa-solid fa-crop-simple"></i> 写真の切り抜き</h2>
+            <div style="width: 100%; max-height: 400px; margin-bottom: 1rem; background: var(--bg-main); display: flex; justify-content: center; align-items: center; border: 1px dashed var(--border-color);">
+                <img id="cropper-image" src="" style="max-width: 100%; display: block;">
+            </div>
+            <div style="display: flex; gap: 1rem;">
+                <button class="cyber-btn" style="flex: 1; background: var(--bg-main); color: var(--text-main);" onclick="closeCropperModal()">CANCEL</button>
+                <button class="cyber-btn" id="btn-crop-upload" style="flex: 2;" onclick="cropAndUpload()"><i class="fa-solid fa-cloud-arrow-up"></i> CROP & UPLOAD</button>
+            </div>
+        </div>
+    </div>
+    <input type="file" id="memberPhotoInput" accept="image/*" style="display: none;">
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
